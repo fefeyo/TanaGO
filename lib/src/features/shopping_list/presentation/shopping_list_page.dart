@@ -28,7 +28,8 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
   @override
   Widget build(BuildContext context) {
     final household = ref.watch(householdProvider);
-    final items = ref.watch(shoppingListProvider(household.id));
+    final itemsAsync = ref.watch(shoppingListProvider(household.id));
+    final items = itemsAsync.valueOrNull ?? const [];
 
     return Scaffold(
       appBar: AppBar(
@@ -87,7 +88,7 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
                           return Dismissible(
                             key: ValueKey(item.id),
                             onDismissed: (_) => ref
-                                .read(shoppingListProvider(ref.read(householdProvider).id).notifier)
+                                .read(shoppingListControllerProvider(ref.read(householdProvider).id))
                                 .remove(item.id),
                             child: CheckboxListTile(
                               value: item.isPurchased,
@@ -111,7 +112,7 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
                                 ),
                               ),
                               onChanged: (_) => ref
-                                  .read(shoppingListProvider(ref.read(householdProvider).id).notifier)
+                                  .read(shoppingListControllerProvider(ref.read(householdProvider).id))
                                   .togglePurchased(item.id),
                             ),
                           );
@@ -190,13 +191,13 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
 
     if (categoryId != null) {
       ref
-          .read(shoppingListProvider(ref.read(householdProvider).id).notifier)
+          .read(shoppingListControllerProvider(ref.read(householdProvider).id))
           .updateCategory(itemId, categoryId);
     }
   }
 
   void _addItem() {
-    ref.read(shoppingListProvider(ref.read(householdProvider).id).notifier).add(_controller.text);
+    ref.read(shoppingListControllerProvider(ref.read(householdProvider).id)).add(_controller.text);
     _controller.clear();
     setState(() {});
   }
