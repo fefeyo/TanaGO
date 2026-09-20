@@ -8,10 +8,10 @@ void main() {
     final container = ProviderContainer();
     addTearDown(container.dispose);
 
-    final controller = container.read(mapEditorProvider.notifier);
+    final controller = container.read(mapEditorProvider('store-a').notifier);
     controller.add(type: MapObjectType.shelf, x: 1, y: 2);
 
-    final added = container.read(mapEditorProvider).single;
+    final added = container.read(mapEditorProvider('store-a')).single;
     expect(added.width, 3);
     expect(added.height, 1);
 
@@ -23,7 +23,7 @@ void main() {
       categoryIds: const ['dairy'],
     );
 
-    final edited = container.read(mapEditorProvider).single;
+    final edited = container.read(mapEditorProvider('store-a')).single;
     expect(edited.x, 4);
     expect(edited.y, 5);
     expect(edited.width, 5);
@@ -36,13 +36,13 @@ void main() {
     final container = ProviderContainer();
     addTearDown(container.dispose);
 
-    final controller = container.read(mapEditorProvider.notifier);
+    final controller = container.read(mapEditorProvider('store-a').notifier);
     controller.add(type: MapObjectType.shelf, x: 0, y: 0);
 
-    final id = container.read(mapEditorProvider).single.id;
+    final id = container.read(mapEditorProvider('store-a')).single.id;
     controller.updateDetails(id: id, label: '精肉');
     controller.updateDetails(id: id, label: '');
 
-    expect(container.read(mapEditorProvider).single.label, isNull);
+    expect(container.read(mapEditorProvider('store-a')).single.label, isNull);
   });
 }
