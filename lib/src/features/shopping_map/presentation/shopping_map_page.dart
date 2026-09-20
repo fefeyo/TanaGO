@@ -26,7 +26,7 @@ class _ShoppingMapPageState extends ConsumerState<ShoppingMapPage> {
 
   @override
   Widget build(BuildContext context) {
-    final objects = ref.watch(mapEditorProvider);
+    final objects = ref.watch(mapEditorProvider(widget.storeId));
     final shoppingItems = ref.watch(shoppingListProvider);
     final pendingItems = shoppingItems
         .where((item) => !item.isPurchased && item.categoryId != null)
