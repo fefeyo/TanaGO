@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../household/presentation/household_controller.dart';
 import '../../product_categories/domain/product_categories.dart';
 import '../../product_categories/domain/product_category_classifier.dart';
+import '../domain/shopping_item.dart';
 import 'shopping_list_controller.dart';
 
 class ShoppingListPage extends ConsumerStatefulWidget {
@@ -29,7 +30,7 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
   Widget build(BuildContext context) {
     final household = ref.watch(householdProvider);
     final itemsAsync = ref.watch(shoppingListProvider(household.id));
-    final items = itemsAsync.valueOrNull ?? const [];
+    final items = itemsAsync.valueOrNull ?? const <ShoppingItem>[];
 
     return Scaffold(
       appBar: AppBar(
