@@ -41,8 +41,16 @@ class FirestoreStoreRepository implements StoreRepository {
   }
 
   @override
-  Future<void> removeStore(String householdId, String storeId) {
-    return _stores(householdId).doc(storeId).delete();
+  Future<void> removeStore(String householdId, String storeId) async {
+    final store = _stores(householdId).doc(storeId);
+    final mapObjects = await store.collection('mapObjects').get();
+
+    final batch = _firestore.batch();
+    for (final document in mapObjects.docs) {
+      batch.delete(document.reference);
+    }
+    batch.delete(store);
+    await batch.commit();
   }
 
   Store _fromDocument(
