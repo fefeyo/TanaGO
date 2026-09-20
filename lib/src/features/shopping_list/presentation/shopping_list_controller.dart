@@ -6,16 +6,17 @@ import '../../product_categories/domain/product_category_classifier.dart';
 import '../domain/shopping_item.dart';
 
 final shoppingListProvider =
-    NotifierProvider<ShoppingListController, List<ShoppingItem>>(
+    NotifierProvider.family<ShoppingListController, List<ShoppingItem>, String>(
   ShoppingListController.new,
 );
 
-class ShoppingListController extends Notifier<List<ShoppingItem>> {
+class ShoppingListController
+    extends FamilyNotifier<List<ShoppingItem>, String> {
   static const _uuid = Uuid();
   static const _categoryClassifier = ProductCategoryClassifier();
 
   @override
-  List<ShoppingItem> build() => const [];
+  List<ShoppingItem> build(String householdId) => const [];
 
   void add(String name, {String? categoryId}) {
     final trimmed = name.trim();
