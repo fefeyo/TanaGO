@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import 'features/map_editor/presentation/map_editor_page.dart';
 import 'features/shopping_list/presentation/shopping_list_page.dart';
 import 'features/stores/presentation/store_list_page.dart';
 
@@ -17,6 +18,12 @@ class TanaGoApp extends StatelessWidget {
         path: '/stores',
         builder: (context, state) => const StoreListPage(),
       ),
+      GoRoute(
+        path: '/stores/:storeId/map',
+        builder: (context, state) => MapEditorPage(
+          storeId: state.pathParameters['storeId']!,
+        ),
+      ),
     ],
   );
 
@@ -26,7 +33,9 @@ class TanaGoApp extends StatelessWidget {
       title: 'TanaGO',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2E7D32)),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF2E7D32),
+        ),
         useMaterial3: true,
       ),
       routerConfig: _router,
