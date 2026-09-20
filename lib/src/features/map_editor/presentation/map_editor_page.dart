@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../household/presentation/household_controller.dart';
 import '../../product_categories/domain/product_categories.dart';
 import '../domain/map_object.dart';
+import '../domain/store_map_key.dart';
 import 'map_editor_controller.dart';
 
 class MapEditorPage extends ConsumerStatefulWidget {
@@ -22,9 +24,19 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
   final Map<String, Offset> _dragOrigins = {};
   final Map<String, Offset> _dragDeltas = {};
 
+  StoreMapKey get _mapKey => StoreMapKey(
+        householdId: ref.read(householdProvider).id,
+        storeId: widget.storeId,
+      );
+
   @override
   Widget build(BuildContext context) {
-    final objectsAsync = ref.watch(mapEditorProvider(widget.storeId));
+    final household = ref.watch(householdProvider);
+    final mapKey = StoreMapKey(
+      householdId: household.id,
+      storeId: widget.storeId,
+    );
+    final objectsAsync = ref.watch(mapEditorProvider(mapKey));
     final objects = objectsAsync.valueOrNull ?? const <MapObject>[];
 
     return Scaffold(
@@ -36,7 +48,7 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
             onPressed: objects.isEmpty
                 ? null
                 : () {
-                    ref.read(mapEditorControllerProvider(widget.storeId)).clear();
+                    ref.read(mapEditorControllerProvider(_mapKey)).clear();
                     setState(() => _selectedObjectId = null);
                   },
             icon: const Icon(Icons.delete_sweep_outlined),
@@ -76,7 +88,7 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
                                   (details.localPosition.dy / cellSize).floor();
                               final x = rawX.clamp(0, _columns - width);
 
-                              ref.read(mapEditorControllerProvider(widget.storeId)).add(
+                              ref.read(mapEditorControllerProvider(_mapKey)).add(
                                     type: _selectedType,
                                     x: x,
                                     y: y.clamp(0, _rows - 1),
@@ -123,7 +135,7 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
                                     .round()
                                     .clamp(0, _rows - object.height);
 
-                                ref.read(mapEditorControllerProvider(widget.storeId)).move(
+                                ref.read(mapEditorControllerProvider(_mapKey)).move(
                                       id: object.id,
                                       x: x,
                                       y: y,
@@ -165,7 +177,7 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
 
   Future<void> _showObjectEditor(String objectId) async {
     final initialObject = ref
-        .read(mapEditorProvider(widget.storeId))
+        .read(mapEditorProvider(_mapKey))
         .valueOrNull
         ?.where((object) => object.id == objectId)
         .firstOrNull;
@@ -181,7 +193,7 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
         return Consumer(
           builder: (context, ref, child) {
             final object = ref
-                .watch(mapEditorProvider(widget.storeId))
+                .watch(mapEditorProvider(_mapKey))
                 .valueOrNull
                 ?.where((object) => object.id == objectId)
                 .firstOrNull;
@@ -213,7 +225,7 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
                       ),
                       textInputAction: TextInputAction.done,
                       onSubmitted: (value) {
-                        ref.read(mapEditorControllerProvider(widget.storeId)).updateDetails(
+                        ref.read(mapEditorControllerProvider(_mapKey)).updateDetails(
                               id: object.id,
                               label: value,
                             );
@@ -243,7 +255,7 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
                                 categoryIds.remove(category.id);
                               }
                               ref
-                                  .read(mapEditorControllerProvider(widget.storeId))
+                                  .read(mapEditorControllerProvider(_mapKey))
                                   .updateDetails(
                                     id: object.id,
                                     categoryIds: categoryIds.toList(),
@@ -258,7 +270,7 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
                     width: object.width,
                     height: object.height,
                     onResize: (width, height) {
-                      ref.read(mapEditorControllerProvider(widget.storeId)).resize(
+                      ref.read(mapEditorControllerProvider(_mapKey)).resize(
                             id: object.id,
                             width: width.clamp(1, _columns - object.x),
                             height: height.clamp(1, _rows - object.y),
@@ -270,7 +282,7 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
                     children: [
                       TextButton.icon(
                         onPressed: () {
-                          ref.read(mapEditorControllerProvider(widget.storeId)).remove(object.id);
+                          ref.read(mapEditorControllerProvider(_mapKey)).remove(object.id);
                           Navigator.of(context).pop();
                         },
                         icon: const Icon(Icons.delete_outline),
@@ -280,7 +292,7 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
                       FilledButton(
                         onPressed: () {
                           if (object.type == MapObjectType.shelf) {
-                            ref.read(mapEditorControllerProvider(widget.storeId)).updateDetails(
+                            ref.read(mapEditorControllerProvider(_mapKey)).updateDetails(
                                   id: object.id,
                                   label: labelController.text.trim(),
                                 );
@@ -322,7 +334,7 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
     );
 
     if (shouldDelete == true) {
-      ref.read(mapEditorControllerProvider(widget.storeId)).remove(object.id);
+      ref.read(mapEditorControllerProvider(_mapKey)).remove(object.id);
       if (_selectedObjectId == object.id) {
         setState(() => _selectedObjectId = null);
       }
