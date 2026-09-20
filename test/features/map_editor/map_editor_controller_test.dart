@@ -4,70 +4,71 @@ import 'package:tanago/src/features/map_editor/domain/map_object.dart';
 import 'package:tanago/src/features/map_editor/presentation/map_editor_controller.dart';
 
 void main() {
-  test('adds and edits a shelf', () {
+  test('adds and edits a shelf', () async {
     final container = ProviderContainer();
     addTearDown(container.dispose);
 
-    final controller = container.read(mapEditorProvider('store-a').notifier);
-    controller.add(type: MapObjectType.shelf, x: 1, y: 2);
+    final controller = container.read(mapEditorControllerProvider('store-a'));
+    final repository = container.read(mapRepositoryProvider);
 
-    final added = container.read(mapEditorProvider('store-a')).single;
-    expect(added.width, 3);
-    expect(added.height, 1);
+    await controller.add(type: MapObjectType.shelf, x: 1, y: 2);
+    var object = (await repository.getObjects('store-a')).single;
+    expect(object.width, 3);
+    expect(object.height, 1);
 
-    controller.move(id: added.id, x: 4, y: 5);
-    controller.resize(id: added.id, width: 5, height: 2);
-    controller.updateDetails(
-      id: added.id,
+    await controller.move(id: object.id, x: 4, y: 5);
+    await controller.resize(id: object.id, width: 5, height: 2);
+    await controller.updateDetails(
+      id: object.id,
       label: '乳製品',
       categoryIds: const ['dairy'],
     );
 
-    final edited = container.read(mapEditorProvider('store-a')).single;
-    expect(edited.x, 4);
-    expect(edited.y, 5);
-    expect(edited.width, 5);
-    expect(edited.height, 2);
-    expect(edited.label, '乳製品');
-    expect(edited.categoryIds, const ['dairy']);
+    object = (await repository.getObjects('store-a')).single;
+    expect(object.x, 4);
+    expect(object.y, 5);
+    expect(object.width, 5);
+    expect(object.height, 2);
+    expect(object.label, '乳製品');
+    expect(object.categoryIds, const ['dairy']);
   });
 
-  test('clears a shelf label', () {
+  test('clears a shelf label', () async {
     final container = ProviderContainer();
     addTearDown(container.dispose);
 
-    final controller = container.read(mapEditorProvider('store-a').notifier);
-    controller.add(type: MapObjectType.shelf, x: 0, y: 0);
+    final controller = container.read(mapEditorControllerProvider('store-a'));
+    final repository = container.read(mapRepositoryProvider);
 
-    final id = container.read(mapEditorProvider('store-a')).single.id;
-    controller.updateDetails(id: id, label: '精肉');
-    controller.updateDetails(id: id, label: '');
+    await controller.add(type: MapObjectType.shelf, x: 0, y: 0);
+    final id = (await repository.getObjects('store-a')).single.id;
+    await controller.updateDetails(id: id, label: '精肉');
+    await controller.updateDetails(id: id, label: '');
 
-    expect(container.read(mapEditorProvider('store-a')).single.label, isNull);
+    expect((await repository.getObjects('store-a')).single.label, isNull);
   });
 
-  test('keeps map objects isolated per store', () {
+  test('keeps map objects isolated per store', () async {
     final container = ProviderContainer();
     addTearDown(container.dispose);
 
-    container
-        .read(mapEditorProvider('store-a').notifier)
+    await container
+        .read(mapEditorControllerProvider('store-a'))
         .add(type: MapObjectType.shelf, x: 1, y: 1);
-    container
-        .read(mapEditorProvider('store-b').notifier)
+    await container
+        .read(mapEditorControllerProvider('store-b'))
         .add(type: MapObjectType.register, x: 8, y: 12);
 
-    final storeAMap = container.read(mapEditorProvider('store-a'));
-    final storeBMap = container.read(mapEditorProvider('store-b'));
+    final repository = container.read(mapRepositoryProvider);
+    expect((await repository.getObjects('store-a')).single.type, MapObjectType.shelf);
+    expect(
+      (await repository.getObjects('store-b')).single.type,
+      MapObjectType.register,
+    );
 
-    expect(storeAMap, hasLength(1));
-    expect(storeAMap.single.type, MapObjectType.shelf);
-    expect(storeBMap, hasLength(1));
-    expect(storeBMap.single.type, MapObjectType.register);
+    await container.read(mapEditorControllerProvider('store-a')).clear();
 
-    container.read(mapEditorProvider('store-a').notifier).clear();
-
-    expect(container.read(mapEditorProvider('store-a')), isEmpty);
-    expect(container.read(mapEditorProvider('store-b')), hasLength(1));
+    expect(await repository.getObjects('store-a'), isEmpty);
+    expect(await repository.getObjects('store-b'), hasLength(1));
   });
 }
