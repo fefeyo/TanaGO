@@ -14,6 +14,11 @@ class InMemoryStoreRepository implements StoreRepository {
   }
 
   @override
+  Future<List<Store>> getStores(String householdId) async {
+    return List.unmodifiable(_stores[householdId] ?? const []);
+  }
+
+  @override
   Future<void> addStore(String householdId, Store store) async {
     _stores[householdId] = [...?_stores[householdId], store];
     _emit(householdId);
