@@ -3,10 +3,8 @@ import 'package:uuid/uuid.dart';
 
 import '../domain/map_object.dart';
 
-final mapEditorProvider = NotifierProviderFamily<
-    MapEditorController,
-    List<MapObject>,
-    String>(
+final mapEditorProvider =
+    NotifierProvider.family<MapEditorController, List<MapObject>, String>(
   MapEditorController.new,
 );
 
