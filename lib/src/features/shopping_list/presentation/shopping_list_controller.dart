@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../household/presentation/household_controller.dart';
+import '../../product_categories/domain/product_category_classifier.dart';
 import '../domain/shopping_item.dart';
 
 final shoppingListProvider =
@@ -11,6 +12,7 @@ final shoppingListProvider =
 
 class ShoppingListController extends Notifier<List<ShoppingItem>> {
   static const _uuid = Uuid();
+  static const _categoryClassifier = ProductCategoryClassifier();
 
   @override
   List<ShoppingItem> build() => const [];
@@ -28,7 +30,7 @@ class ShoppingListController extends Notifier<List<ShoppingItem>> {
         name: trimmed,
         addedByUid: localUserId,
         createdAt: DateTime.now(),
-        categoryId: categoryId,
+        categoryId: categoryId ?? _categoryClassifier.classify(trimmed),
       ),
     ];
   }
