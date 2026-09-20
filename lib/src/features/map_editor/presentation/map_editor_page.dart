@@ -60,10 +60,28 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
                     child: Stack(
                       children: [
                         Positioned.fill(
-                          child: CustomPaint(
-                            painter: _GridPainter(
-                              columns: _columns,
-                              rows: _rows,
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTapUp: (details) {
+                              final width =
+                                  _selectedType == MapObjectType.shelf ? 3 : 1;
+                              final rawX =
+                                  (details.localPosition.dx / cellSize).floor();
+                              final y =
+                                  (details.localPosition.dy / cellSize).floor();
+                              final x = rawX.clamp(0, _columns - width);
+
+                              ref.read(mapEditorProvider.notifier).add(
+                                    type: _selectedType,
+                                    x: x,
+                                    y: y.clamp(0, _rows - 1),
+                                  );
+                            },
+                            child: CustomPaint(
+                              painter: const _GridPainter(
+                                columns: _columns,
+                                rows: _rows,
+                              ),
                             ),
                           ),
                         ),
@@ -80,28 +98,16 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
                                   .remove(object.id),
                             ),
                           ),
-                        Positioned.fill(
-                          child: GestureDetector(
-                            behavior: HitTestBehavior.translucent,
-                            onTapUp: (details) {
-                              final x =
-                                  (details.localPosition.dx / cellSize).floor();
-                              final y =
-                                  (details.localPosition.dy / cellSize).floor();
-                              ref.read(mapEditorProvider.notifier).add(
-                                    type: _selectedType,
-                                    x: x.clamp(0, _columns - 1),
-                                    y: y.clamp(0, _rows - 1),
-                                  );
-                            },
-                          ),
-                        ),
                       ],
                     ),
                   ),
                 );
               },
             ),
+          ),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: Text('グリッドをタップして配置 / オブジェクトを長押しして削除'),
           ),
         ],
       ),
@@ -166,10 +172,13 @@ class _MapObjectTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = switch (object.type) {
       MapObjectType.shelf => Theme.of(context).colorScheme.primaryContainer,
-      MapObjectType.wall => Theme.of(context).colorScheme.surfaceContainerHighest,
-      MapObjectType.entrance => Theme.of(context).colorScheme.tertiaryContainer,
+      MapObjectType.wall =>
+        Theme.of(context).colorScheme.surfaceContainerHighest,
+      MapObjectType.entrance =>
+        Theme.of(context).colorScheme.tertiaryContainer,
       MapObjectType.exit => Theme.of(context).colorScheme.tertiaryContainer,
-      MapObjectType.register => Theme.of(context).colorScheme.secondaryContainer,
+      MapObjectType.register =>
+        Theme.of(context).colorScheme.secondaryContainer,
     };
 
     return InkWell(
