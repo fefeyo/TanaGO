@@ -10,8 +10,9 @@ Someone at home adds what they want bought. The person going shopping checks the
 2. Add items to the household shopping list
 3. Select a household store
 4. Open the store's indoor map
-5. See where the requested items are located
-6. Mark items as purchased
+5. See highlighted shelves for requested items
+6. Tap a shelf to see the items to buy there
+7. Mark items as purchased
 
 ## Tech stack
 
@@ -23,20 +24,43 @@ Someone at home adds what they want bought. The person going shopping checks the
 
 ## Current implementation
 
-The repository currently contains the domain/UI foundation before Firebase configuration:
+The repository currently contains the app foundation before Firebase project configuration:
 
-- household-aware domain model
-- shared shopping-list model with added/purchased user metadata
-- local shopping-list prototype
-- household-owned store model
-- store registration prototype
+- household-aware shopping lists and stores
+- automatic product-category classification with manual correction
 - grid-based store map editor
-- shelf / wall / entrance / register placement
+- category assignment for shelves
+- shopping map with highlighted required shelves
+- selected-shelf item panel
+- repository contracts for shopping lists, stores, and maps
+- in-memory repository implementations used by the app today
+- Firestore repository adapters prepared for the final Firebase connection
+- unit tests for household/store isolation and shopping-map matching
 
-Firebase synchronization will be connected after the Firebase project configuration is available.
+## Data boundaries
+
+Application state is scoped so data from different households and stores cannot mix:
+
+- shopping list: `householdId`
+- stores: `householdId`
+- store map: `householdId + storeId`
+
+The planned Firestore hierarchy is:
+
+```text
+households/{householdId}
+  shoppingLists/active
+    items/{itemId}
+  stores/{storeId}
+    mapObjects/{mapObjectId}
+```
+
+Household members will also live under the household when authentication and invitations are connected.
 
 ## Architecture
 
 Feature-oriented structure under `lib/src/features`.
 
-Map editing and future route-finding logic are kept independent from Firebase so they can be unit tested as pure Dart logic.
+Presentation code depends on repository contracts instead of Firestore directly. The current providers use in-memory repositories, while Firestore implementations live in each feature's `data` layer. Once Firebase configuration is available, the repository providers can be switched to the Firestore implementations without changing the screens or feature controllers.
+
+Firebase initialization, authentication, household membership, security rules, and the repository-provider switch will be connected after the Firebase project configuration is available.
