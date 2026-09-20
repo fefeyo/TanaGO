@@ -11,13 +11,8 @@ final mapEditorProvider =
 class MapEditorController extends FamilyNotifier<List<MapObject>, String> {
   static const _uuid = Uuid();
 
-  late final String storeId;
-
   @override
-  List<MapObject> build(String arg) {
-    storeId = arg;
-    return const [];
-  }
+  List<MapObject> build(String storeId) => const [];
 
   void add({
     required MapObjectType type,
