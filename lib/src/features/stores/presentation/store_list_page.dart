@@ -12,7 +12,8 @@ class StoreListPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final household = ref.watch(householdProvider);
-    final stores = ref.watch(storesProvider(household.id));
+    final storesAsync = ref.watch(storesProvider(household.id));
+    final stores = storesAsync.valueOrNull ?? const [];
 
     return Scaffold(
       appBar: AppBar(title: const Text('店舗を選ぶ')),
@@ -90,7 +91,7 @@ class StoreListPage extends ConsumerWidget {
     controller.dispose();
 
     if (name != null) {
-      ref.read(storesProvider(householdId).notifier).add(name);
+      ref.read(storeControllerProvider(householdId)).add(name);
     }
   }
 }
