@@ -1,26 +1,87 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
-class StoreListPage extends StatelessWidget {
+import 'store_controller.dart';
+
+class StoreListPage extends ConsumerWidget {
   const StoreListPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final stores = ref.watch(storesProvider);
+
     return Scaffold(
       appBar: AppBar(title: const Text('店舗を選ぶ')),
-      body: const Center(
-        child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Text(
-            '次の実装で、店舗登録と店内マップクリエイターを追加します。',
-            textAlign: TextAlign.center,
-          ),
-        ),
-      ),
+      body: stores.isEmpty
+          ? const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Text(
+                  'まだ店舗がありません。\nよく行くスーパーを登録しましょう。',
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            )
+          : ListView.separated(
+              padding: const EdgeInsets.all(16),
+              itemCount: stores.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (context, index) {
+                final store = stores[index];
+                return Card(
+                  child: ListTile(
+                    leading: const Icon(Icons.storefront),
+                    title: Text(store.name),
+                    subtitle: const Text('店内マップを編集'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => context.push('/stores/${store.id}/map'),
+                  ),
+                );
+              },
+            ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: null,
-        icon: Icon(Icons.add_business),
-        label: Text('店舗を追加'),
+        onPressed: () => _showAddStoreDialog(context, ref),
+        icon: const Icon(Icons.add_business),
+        label: const Text('店舗を追加'),
       ),
     );
+  }
+
+  Future<void> _showAddStoreDialog(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final controller = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('店舗を追加'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: '店舗名',
+            hintText: '例: ○○スーパー △△店',
+          ),
+          onSubmitted: (value) => Navigator.pop(context, value),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('キャンセル'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: const Text('追加'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+
+    if (name != null) {
+      ref.read(storesProvider.notifier).add(name);
+    }
   }
 }
