@@ -25,7 +25,7 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
   final Map<String, Offset> _dragDeltas = {};
 
   StoreMapKey get _mapKey => StoreMapKey(
-        householdId: ref.read(householdProvider).id,
+        householdId: ref.read(householdProvider).valueOrNull!.id,
         storeId: widget.storeId,
       );
 
