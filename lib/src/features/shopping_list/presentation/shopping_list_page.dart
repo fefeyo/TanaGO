@@ -89,7 +89,7 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
                           return Dismissible(
                             key: ValueKey(item.id),
                             onDismissed: (_) => ref
-                                .read(shoppingListControllerProvider(ref.read(householdProvider).id))
+                                .read(shoppingListControllerProvider(ref.read(householdProvider).valueOrNull!.id))
                                 .remove(item.id),
                             child: CheckboxListTile(
                               value: item.isPurchased,
@@ -113,7 +113,7 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
                                 ),
                               ),
                               onChanged: (_) => ref
-                                  .read(shoppingListControllerProvider(ref.read(householdProvider).id))
+                                  .read(shoppingListControllerProvider(ref.read(householdProvider).valueOrNull!.id))
                                   .togglePurchased(item.id),
                             ),
                           );
@@ -192,13 +192,13 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
 
     if (categoryId != null) {
       ref
-          .read(shoppingListControllerProvider(ref.read(householdProvider).id))
+          .read(shoppingListControllerProvider(ref.read(householdProvider).valueOrNull!.id))
           .updateCategory(itemId, categoryId);
     }
   }
 
   void _addItem() {
-    ref.read(shoppingListControllerProvider(ref.read(householdProvider).id)).add(_controller.text);
+    ref.read(shoppingListControllerProvider(ref.read(householdProvider).valueOrNull!.id)).add(_controller.text);
     _controller.clear();
     setState(() {});
   }
