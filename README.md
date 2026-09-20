@@ -34,6 +34,7 @@ The repository currently contains the app foundation before Firebase project con
 - selected-shelf item panel
 - repository contracts for shopping lists, stores, and maps
 - in-memory repository implementations used by the app today
+- authentication abstraction with local and Firebase Auth adapters
 - Firestore repository adapters prepared for the final Firebase connection
 - unit tests for household/store isolation and shopping-map matching
 
@@ -63,4 +64,4 @@ Feature-oriented structure under `lib/src/features`.
 
 Presentation code depends on repository contracts instead of Firestore directly. The current providers use in-memory repositories, while Firestore implementations live in each feature's `data` layer. Once Firebase configuration is available, the repository providers can be switched to the Firestore implementations without changing the screens or feature controllers.
 
-Firebase initialization, authentication, household membership, security rules, and the repository-provider switch will be connected after the Firebase project configuration is available.
+Firebase initialization, security rules, and the provider switch from the in-memory adapters to Firebase Auth / Firestore will be connected after the Firebase project configuration is available.
