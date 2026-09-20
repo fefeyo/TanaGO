@@ -5,11 +5,7 @@ import '../domain/map_object.dart';
 import 'map_editor_controller.dart';
 
 class MapEditorPage extends ConsumerStatefulWidget {
-  const MapEditorPage({
-    required this.storeId,
-    super.key,
-  });
-
+  const MapEditorPage({required this.storeId, super.key});
   final String storeId;
 
   @override
@@ -21,6 +17,9 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
   static const _rows = 16;
 
   MapObjectType _selectedType = MapObjectType.shelf;
+  String? _selectedObjectId;
+  final Map<String, Offset> _dragOrigins = {};
+  final Map<String, Offset> _dragDeltas = {};
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +33,10 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
             tooltip: 'すべて削除',
             onPressed: objects.isEmpty
                 ? null
-                : ref.read(mapEditorProvider.notifier).clear,
+                : () {
+                    ref.read(mapEditorProvider.notifier).clear();
+                    setState(() => _selectedObjectId = null);
+                  },
             icon: const Icon(Icons.delete_sweep_outlined),
           ),
         ],
@@ -49,13 +51,14 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final cellSize = constraints.maxWidth / _columns;
+                final mapWidth = constraints.maxWidth - 24;
+                final cellSize = mapWidth / _columns;
                 final mapHeight = cellSize * _rows;
 
                 return SingleChildScrollView(
                   padding: const EdgeInsets.all(12),
                   child: SizedBox(
-                    width: constraints.maxWidth,
+                    width: mapWidth,
                     height: mapHeight,
                     child: Stack(
                       children: [
@@ -91,11 +94,45 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
                             top: object.y * cellSize,
                             width: object.width * cellSize,
                             height: object.height * cellSize,
-                            child: _MapObjectTile(
-                              object: object,
-                              onDelete: () => ref
-                                  .read(mapEditorProvider.notifier)
-                                  .remove(object.id),
+                            child: GestureDetector(
+                              onTap: () => _selectObject(object),
+                              onLongPress: () => _confirmDelete(object),
+                              onPanStart: (_) {
+                                _dragOrigins[object.id] = Offset(
+                                  object.x.toDouble(),
+                                  object.y.toDouble(),
+                                );
+                                _dragDeltas[object.id] = Offset.zero;
+                                setState(() => _selectedObjectId = object.id);
+                              },
+                              onPanUpdate: (details) {
+                                final origin = _dragOrigins[object.id];
+                                if (origin == null) return;
+
+                                final delta =
+                                    (_dragDeltas[object.id] ?? Offset.zero) +
+                                        details.delta;
+                                _dragDeltas[object.id] = delta;
+
+                                final x = (origin.dx + delta.dx / cellSize)
+                                    .round()
+                                    .clamp(0, _columns - object.width);
+                                final y = (origin.dy + delta.dy / cellSize)
+                                    .round()
+                                    .clamp(0, _rows - object.height);
+
+                                ref.read(mapEditorProvider.notifier).move(
+                                      id: object.id,
+                                      x: x,
+                                      y: y,
+                                    );
+                              },
+                              onPanEnd: (_) => _finishDrag(object.id),
+                              onPanCancel: () => _finishDrag(object.id),
+                              child: _MapObjectTile(
+                                object: object,
+                                isSelected: object.id == _selectedObjectId,
+                              ),
                             ),
                           ),
                       ],
@@ -107,19 +144,167 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
           ),
           const Padding(
             padding: EdgeInsets.fromLTRB(16, 8, 16, 16),
-            child: Text('グリッドをタップして配置 / オブジェクトを長押しして削除'),
+            child: Text('タップで配置 / ドラッグで移動 / オブジェクトをタップして編集'),
           ),
         ],
       ),
     );
   }
+
+  void _finishDrag(String id) {
+    _dragOrigins.remove(id);
+    _dragDeltas.remove(id);
+  }
+
+  void _selectObject(MapObject object) {
+    setState(() => _selectedObjectId = object.id);
+    _showObjectEditor(object.id);
+  }
+
+  Future<void> _showObjectEditor(String objectId) async {
+    final initialObject = ref
+        .read(mapEditorProvider)
+        .where((object) => object.id == objectId)
+        .firstOrNull;
+    if (initialObject == null) return;
+
+    final labelController = TextEditingController(text: initialObject.label ?? '');
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) {
+        return Consumer(
+          builder: (context, ref, child) {
+            final object = ref
+                .watch(mapEditorProvider)
+                .where((object) => object.id == objectId)
+                .firstOrNull;
+            if (object == null) return const SizedBox.shrink();
+
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                0,
+                20,
+                20 + MediaQuery.viewInsetsOf(context).bottom,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    _objectTitle(object.type),
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 16),
+                  if (object.type == MapObjectType.shelf) ...[
+                    TextField(
+                      controller: labelController,
+                      decoration: const InputDecoration(
+                        labelText: '売り場名',
+                        hintText: '例：乳製品、調味料',
+                        border: OutlineInputBorder(),
+                      ),
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: (value) {
+                        ref.read(mapEditorProvider.notifier).updateDetails(
+                              id: object.id,
+                              label: value,
+                            );
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  _SizeEditor(
+                    width: object.width,
+                    height: object.height,
+                    onResize: (width, height) {
+                      ref.read(mapEditorProvider.notifier).resize(
+                            id: object.id,
+                            width: width.clamp(1, _columns - object.x),
+                            height: height.clamp(1, _rows - object.y),
+                          );
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      TextButton.icon(
+                        onPressed: () {
+                          ref.read(mapEditorProvider.notifier).remove(object.id);
+                          Navigator.of(context).pop();
+                        },
+                        icon: const Icon(Icons.delete_outline),
+                        label: const Text('削除'),
+                      ),
+                      const Spacer(),
+                      FilledButton(
+                        onPressed: () {
+                          if (object.type == MapObjectType.shelf) {
+                            ref.read(mapEditorProvider.notifier).updateDetails(
+                                  id: object.id,
+                                  label: labelController.text.trim(),
+                                );
+                          }
+                          Navigator.of(context).pop();
+                        },
+                        child: const Text('完了'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    labelController.dispose();
+  }
+
+  Future<void> _confirmDelete(MapObject object) async {
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('削除しますか？'),
+        content: Text('${_objectTitle(object.type)}をマップから削除します。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('キャンセル'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('削除'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldDelete == true) {
+      ref.read(mapEditorProvider.notifier).remove(object.id);
+      if (_selectedObjectId == object.id) {
+        setState(() => _selectedObjectId = null);
+      }
+    }
+  }
+
+  String _objectTitle(MapObjectType type) {
+    return switch (type) {
+      MapObjectType.shelf => '棚を編集',
+      MapObjectType.wall => '壁を編集',
+      MapObjectType.entrance => '入口を編集',
+      MapObjectType.exit => '出口を編集',
+      MapObjectType.register => 'レジを編集',
+    };
+  }
 }
 
 class _ObjectPalette extends StatelessWidget {
-  const _ObjectPalette({
-    required this.selectedType,
-    required this.onSelected,
-  });
+  const _ObjectPalette({required this.selectedType, required this.onSelected});
 
   final MapObjectType selectedType;
   final ValueChanged<MapObjectType> onSelected;
@@ -159,14 +344,90 @@ class _ObjectPalette extends StatelessWidget {
   }
 }
 
-class _MapObjectTile extends StatelessWidget {
-  const _MapObjectTile({
-    required this.object,
-    required this.onDelete,
+class _SizeEditor extends StatelessWidget {
+  const _SizeEditor({
+    required this.width,
+    required this.height,
+    required this.onResize,
   });
 
+  final int width;
+  final int height;
+  final void Function(int width, int height) onResize;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('サイズ', style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: _Stepper(
+                label: '横',
+                value: width,
+                onDecrement:
+                    width > 1 ? () => onResize(width - 1, height) : null,
+                onIncrement: () => onResize(width + 1, height),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _Stepper(
+                label: '縦',
+                value: height,
+                onDecrement:
+                    height > 1 ? () => onResize(width, height - 1) : null,
+                onIncrement: () => onResize(width, height + 1),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _Stepper extends StatelessWidget {
+  const _Stepper({
+    required this.label,
+    required this.value,
+    required this.onDecrement,
+    required this.onIncrement,
+  });
+
+  final String label;
+  final int value;
+  final VoidCallback? onDecrement;
+  final VoidCallback onIncrement;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          IconButton(onPressed: onDecrement, icon: const Icon(Icons.remove)),
+          Expanded(
+            child: Text('$label $value', textAlign: TextAlign.center),
+          ),
+          IconButton(onPressed: onIncrement, icon: const Icon(Icons.add)),
+        ],
+      ),
+    );
+  }
+}
+
+class _MapObjectTile extends StatelessWidget {
+  const _MapObjectTile({required this.object, required this.isSelected});
+
   final MapObject object;
-  final VoidCallback onDelete;
+  final bool isSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -181,26 +442,57 @@ class _MapObjectTile extends StatelessWidget {
         Theme.of(context).colorScheme.secondaryContainer,
     };
 
-    return InkWell(
-      onLongPress: onDelete,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: color,
-          border: Border.all(
-            color: Theme.of(context).colorScheme.outline,
-          ),
-          borderRadius: BorderRadius.circular(4),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 140),
+      decoration: BoxDecoration(
+        color: color,
+        border: Border.all(
+          color: isSelected
+              ? Theme.of(context).colorScheme.primary
+              : Theme.of(context).colorScheme.outline,
+          width: isSelected ? 3 : 1,
         ),
-        child: Center(
-          child: Icon(
-            switch (object.type) {
-              MapObjectType.shelf => Icons.view_agenda_outlined,
-              MapObjectType.wall => Icons.horizontal_rule,
-              MapObjectType.entrance => Icons.login,
-              MapObjectType.exit => Icons.logout,
-              MapObjectType.register => Icons.point_of_sale,
-            },
-            size: 18,
+        borderRadius: BorderRadius.circular(6),
+        boxShadow: isSelected
+            ? [
+                BoxShadow(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .primary
+                      .withValues(alpha: 0.22),
+                  blurRadius: 10,
+                  spreadRadius: 2,
+                ),
+              ]
+            : null,
+      ),
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                switch (object.type) {
+                  MapObjectType.shelf => Icons.view_agenda_outlined,
+                  MapObjectType.wall => Icons.horizontal_rule,
+                  MapObjectType.entrance => Icons.login,
+                  MapObjectType.exit => Icons.logout,
+                  MapObjectType.register => Icons.point_of_sale,
+                },
+                size: 18,
+              ),
+              if (object.label != null && object.label!.isNotEmpty) ...[
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    object.label!,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelSmall,
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
       ),
@@ -209,10 +501,7 @@ class _MapObjectTile extends StatelessWidget {
 }
 
 class _GridPainter extends CustomPainter {
-  const _GridPainter({
-    required this.columns,
-    required this.rows,
-  });
+  const _GridPainter({required this.columns, required this.rows});
 
   final int columns;
   final int rows;
