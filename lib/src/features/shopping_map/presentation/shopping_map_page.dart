@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../map_editor/domain/map_object.dart';
+import '../../map_editor/domain/store_map_key.dart';
 import '../../map_editor/presentation/map_editor_controller.dart';
 import '../../household/presentation/household_controller.dart';
 import '../../shopping_list/domain/shopping_item.dart';
@@ -29,7 +30,11 @@ class _ShoppingMapPageState extends ConsumerState<ShoppingMapPage> {
   @override
   Widget build(BuildContext context) {
     final household = ref.watch(householdProvider);
-    final objectsAsync = ref.watch(mapEditorProvider(widget.storeId));
+    final mapKey = StoreMapKey(
+      householdId: household.id,
+      storeId: widget.storeId,
+    );
+    final objectsAsync = ref.watch(mapEditorProvider(mapKey));
     final shoppingItemsAsync = ref.watch(shoppingListProvider(household.id));
     final objects = objectsAsync.valueOrNull ?? const <MapObject>[];
     final shoppingItems =
