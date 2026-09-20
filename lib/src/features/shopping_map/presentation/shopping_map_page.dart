@@ -5,6 +5,7 @@ import '../../map_editor/domain/map_object.dart';
 import '../../map_editor/presentation/map_editor_controller.dart';
 import '../../shopping_list/domain/shopping_item.dart';
 import '../../shopping_list/presentation/shopping_list_controller.dart';
+import '../domain/shopping_map_matcher.dart';
 
 class ShoppingMapPage extends ConsumerStatefulWidget {
   const ShoppingMapPage({
@@ -32,19 +33,10 @@ class _ShoppingMapPageState extends ConsumerState<ShoppingMapPage> {
         .where((item) => !item.isPurchased && item.categoryId != null)
         .toList();
 
-    final requiredCategoryIds = pendingItems
-        .map((item) => item.categoryId)
-        .whereType<String>()
-        .toSet();
-
-    final requiredShelfIds = objects
-        .where(
-          (object) =>
-              object.type == MapObjectType.shelf &&
-              object.categoryIds.any(requiredCategoryIds.contains),
-        )
-        .map((object) => object.id)
-        .toSet();
+    final highlightedShelfIds = requiredShelfIds(
+      objects: objects,
+      shoppingItems: shoppingItems,
+    );
 
     final selectedShelf = objects
         .where((object) => object.id == _selectedShelfId)
@@ -52,11 +44,10 @@ class _ShoppingMapPageState extends ConsumerState<ShoppingMapPage> {
 
     final selectedItems = selectedShelf == null
         ? const <ShoppingItem>[]
-        : shoppingItems
-            .where(
-              (item) => selectedShelf.categoryIds.contains(item.categoryId),
-            )
-            .toList();
+        : itemsForShelf(
+            shelf: selectedShelf,
+            shoppingItems: shoppingItems,
+          );
 
     return Scaffold(
       appBar: AppBar(
@@ -82,7 +73,7 @@ class _ShoppingMapPageState extends ConsumerState<ShoppingMapPage> {
                   const SizedBox(width: 8),
                   _SummaryChip(
                     icon: Icons.view_agenda_outlined,
-                    label: '${requiredShelfIds.length}か所',
+                    label: '${highlightedShelfIds.length}か所',
                   ),
                 ],
               ),
@@ -127,7 +118,7 @@ class _ShoppingMapPageState extends ConsumerState<ShoppingMapPage> {
                                     child: _ShoppingMapObject(
                                       object: object,
                                       isRequired:
-                                          requiredShelfIds.contains(object.id),
+                                          highlightedShelfIds.contains(object.id),
                                       isSelected:
                                           _selectedShelfId == object.id,
                                       onTap: object.type == MapObjectType.shelf
@@ -148,7 +139,7 @@ class _ShoppingMapPageState extends ConsumerState<ShoppingMapPage> {
             _ShelfItemsPanel(
               shelf: selectedShelf,
               items: selectedItems,
-              hasRequiredShelves: requiredShelfIds.isNotEmpty,
+              hasRequiredShelves: highlightedShelfIds.isNotEmpty,
               onTogglePurchased: (id) => ref
                   .read(shoppingListProvider.notifier)
                   .togglePurchased(id),
