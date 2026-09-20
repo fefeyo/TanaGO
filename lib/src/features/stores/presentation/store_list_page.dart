@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../household/presentation/household_controller.dart';
+
 import 'store_controller.dart';
 
 class StoreListPage extends ConsumerWidget {
@@ -9,7 +11,8 @@ class StoreListPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final stores = ref.watch(storesProvider);
+    final household = ref.watch(householdProvider);
+    final stores = ref.watch(storesProvider(household.id));
 
     return Scaffold(
       appBar: AppBar(title: const Text('店舗を選ぶ')),
@@ -46,7 +49,7 @@ class StoreListPage extends ConsumerWidget {
               },
             ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showAddStoreDialog(context, ref),
+        onPressed: () => _showAddStoreDialog(context, ref, household.id),
         icon: const Icon(Icons.add_business),
         label: const Text('店舗を追加'),
       ),
@@ -56,6 +59,7 @@ class StoreListPage extends ConsumerWidget {
   Future<void> _showAddStoreDialog(
     BuildContext context,
     WidgetRef ref,
+    String householdId,
   ) async {
     final controller = TextEditingController();
     final name = await showDialog<String>(
@@ -86,7 +90,7 @@ class StoreListPage extends ConsumerWidget {
     controller.dispose();
 
     if (name != null) {
-      ref.read(storesProvider.notifier).add(name);
+      ref.read(storesProvider(householdId).notifier).add(name);
     }
   }
 }
