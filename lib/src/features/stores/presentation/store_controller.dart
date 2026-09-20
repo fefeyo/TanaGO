@@ -3,15 +3,21 @@ import 'package:uuid/uuid.dart';
 
 import '../domain/store.dart';
 
-final storesProvider = NotifierProvider<StoreController, List<Store>>(
+final storesProvider =
+    NotifierProvider.family<StoreController, List<Store>, String>(
   StoreController.new,
 );
 
-class StoreController extends Notifier<List<Store>> {
+class StoreController extends FamilyNotifier<List<Store>, String> {
   static const _uuid = Uuid();
 
+  late final String householdId;
+
   @override
-  List<Store> build() => const [];
+  List<Store> build(String arg) {
+    householdId = arg;
+    return const [];
+  }
 
   void add(String name) {
     final trimmed = name.trim();
@@ -23,7 +29,7 @@ class StoreController extends Notifier<List<Store>> {
       ...state,
       Store(
         id: _uuid.v4(),
-        householdId: 'local-household',
+        householdId: householdId,
         name: trimmed,
         mapWidth: 12,
         mapHeight: 16,
