@@ -15,7 +15,7 @@ class ShoppingListController extends Notifier<List<ShoppingItem>> {
   @override
   List<ShoppingItem> build() => const [];
 
-  void add(String name) {
+  void add(String name, {String? categoryId}) {
     final trimmed = name.trim();
     if (trimmed.isEmpty) {
       return;
@@ -28,7 +28,18 @@ class ShoppingListController extends Notifier<List<ShoppingItem>> {
         name: trimmed,
         addedByUid: localUserId,
         createdAt: DateTime.now(),
+        categoryId: categoryId,
       ),
+    ];
+  }
+
+  void updateCategory(String id, String categoryId) {
+    state = [
+      for (final item in state)
+        if (item.id == id)
+          item.copyWith(categoryId: categoryId)
+        else
+          item,
     ];
   }
 
