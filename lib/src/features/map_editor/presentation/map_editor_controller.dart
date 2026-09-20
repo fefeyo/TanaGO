@@ -3,16 +3,23 @@ import 'package:uuid/uuid.dart';
 
 import '../domain/map_object.dart';
 
-final mapEditorProvider =
-    NotifierProvider<MapEditorController, List<MapObject>>(
+final mapEditorProvider = NotifierProviderFamily<
+    MapEditorController,
+    List<MapObject>,
+    String>(
   MapEditorController.new,
 );
 
-class MapEditorController extends Notifier<List<MapObject>> {
+class MapEditorController extends FamilyNotifier<List<MapObject>, String> {
   static const _uuid = Uuid();
 
+  late final String storeId;
+
   @override
-  List<MapObject> build() => const [];
+  List<MapObject> build(String arg) {
+    storeId = arg;
+    return const [];
+  }
 
   void add({
     required MapObjectType type,
