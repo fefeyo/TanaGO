@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../household/presentation/household_controller.dart';
 import 'shopping_list_controller.dart';
 
 class ShoppingListPage extends ConsumerStatefulWidget {
@@ -22,10 +23,23 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
 
   @override
   Widget build(BuildContext context) {
+    final household = ref.watch(householdProvider);
     final items = ref.watch(shoppingListProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('TanaGO')),
+      appBar: AppBar(
+        title: const Text('TanaGO'),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(32),
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              household.name,
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
+          ),
+        ),
+      ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -37,7 +51,7 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
                     child: TextField(
                       controller: _controller,
                       decoration: const InputDecoration(
-                        labelText: '買いたいもの',
+                        labelText: '買ってきてほしいもの',
                         hintText: '例: 牛乳',
                         border: OutlineInputBorder(),
                       ),
@@ -55,7 +69,10 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
               Expanded(
                 child: items.isEmpty
                     ? const Center(
-                        child: Text('買いたいものを追加してください'),
+                        child: Text(
+                          '買ってきてほしいものを追加すると\n同じ家のメンバーと共有できます',
+                          textAlign: TextAlign.center,
+                        ),
                       )
                     : ListView.builder(
                         itemCount: items.length,
@@ -69,6 +86,11 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
                             child: CheckboxListTile(
                               value: item.isPurchased,
                               title: Text(item.name),
+                              subtitle: Text(
+                                item.isPurchased
+                                    ? '購入済み'
+                                    : 'あなたが追加',
+                              ),
                               onChanged: (_) => ref
                                   .read(shoppingListProvider.notifier)
                                   .togglePurchased(item.id),
@@ -84,7 +106,7 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
                       ? null
                       : () => context.push('/stores'),
                   icon: const Icon(Icons.storefront),
-                  label: const Text('店舗を選ぶ'),
+                  label: const Text('買い物に行く'),
                 ),
               ),
             ],
