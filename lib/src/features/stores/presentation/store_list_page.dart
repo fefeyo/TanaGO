@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../household/presentation/household_controller.dart';
-
+import '../domain/store.dart';
 import 'store_controller.dart';
 
 class StoreListPage extends ConsumerWidget {
@@ -13,7 +13,7 @@ class StoreListPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final household = ref.watch(householdProvider);
     final storesAsync = ref.watch(storesProvider(household.id));
-    final stores = storesAsync.valueOrNull ?? const [];
+    final stores = storesAsync.valueOrNull ?? const <Store>[];
 
     return Scaffold(
       appBar: AppBar(title: const Text('店舗を選ぶ')),
