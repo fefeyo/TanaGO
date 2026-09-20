@@ -14,6 +14,12 @@ void main() {
     expect(container.read(shoppingListProvider).single.name, '牛乳');
 
     final id = container.read(shoppingListProvider).single.id;
+    controller.updateCategory(id, 'dairy');
+    expect(
+      container.read(shoppingListProvider).single.categoryId,
+      'dairy',
+    );
+
     controller.togglePurchased(id);
     expect(container.read(shoppingListProvider).single.isPurchased, isTrue);
 
