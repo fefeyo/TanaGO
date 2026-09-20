@@ -29,8 +29,11 @@ class _ShoppingMapPageState extends ConsumerState<ShoppingMapPage> {
   @override
   Widget build(BuildContext context) {
     final household = ref.watch(householdProvider);
-    final objects = ref.watch(mapEditorProvider(widget.storeId));
-    final shoppingItems = ref.watch(shoppingListProvider(household.id));
+    final objectsAsync = ref.watch(mapEditorProvider(widget.storeId));
+    final shoppingItemsAsync = ref.watch(shoppingListProvider(household.id));
+    final objects = objectsAsync.valueOrNull ?? const <MapObject>[];
+    final shoppingItems =
+        shoppingItemsAsync.valueOrNull ?? const <ShoppingItem>[];
     final pendingItems = shoppingItems
         .where((item) => !item.isPurchased && item.categoryId != null)
         .toList();
@@ -143,7 +146,7 @@ class _ShoppingMapPageState extends ConsumerState<ShoppingMapPage> {
               items: selectedItems,
               hasRequiredShelves: highlightedShelfIds.isNotEmpty,
               onTogglePurchased: (id) => ref
-                  .read(shoppingListProvider(household.id).notifier)
+                  .read(shoppingListControllerProvider(household.id))
                   .togglePurchased(id),
             ),
           ],
