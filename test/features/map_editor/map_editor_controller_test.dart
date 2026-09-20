@@ -45,4 +45,29 @@ void main() {
 
     expect(container.read(mapEditorProvider('store-a')).single.label, isNull);
   });
+
+  test('keeps map objects isolated per store', () {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    container
+        .read(mapEditorProvider('store-a').notifier)
+        .add(type: MapObjectType.shelf, x: 1, y: 1);
+    container
+        .read(mapEditorProvider('store-b').notifier)
+        .add(type: MapObjectType.register, x: 8, y: 12);
+
+    final storeAMap = container.read(mapEditorProvider('store-a'));
+    final storeBMap = container.read(mapEditorProvider('store-b'));
+
+    expect(storeAMap, hasLength(1));
+    expect(storeAMap.single.type, MapObjectType.shelf);
+    expect(storeBMap, hasLength(1));
+    expect(storeBMap.single.type, MapObjectType.register);
+
+    container.read(mapEditorProvider('store-a').notifier).clear();
+
+    expect(container.read(mapEditorProvider('store-a')), isEmpty);
+    expect(container.read(mapEditorProvider('store-b')), hasLength(1));
+  });
 }
