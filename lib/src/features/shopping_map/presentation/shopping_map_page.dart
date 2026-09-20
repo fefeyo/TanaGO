@@ -52,7 +52,7 @@ class _ShoppingMapPageState extends ConsumerState<ShoppingMapPage> {
 
     final selectedItems = selectedShelf == null
         ? const <ShoppingItem>[]
-        : pendingItems
+        : shoppingItems
             .where(
               (item) => selectedShelf.categoryIds.contains(item.categoryId),
             )
@@ -81,7 +81,7 @@ class _ShoppingMapPageState extends ConsumerState<ShoppingMapPage> {
                   ),
                   const SizedBox(width: 8),
                   _SummaryChip(
-                    icon: Icons.shelves,
+                    icon: Icons.view_agenda_outlined,
                     label: '${requiredShelfIds.length}か所',
                   ),
                 ],
@@ -245,7 +245,7 @@ class _ShoppingMapObject extends StatelessWidget {
         child: Center(
           child: Icon(
             switch (object.type) {
-              MapObjectType.shelf => Icons.shelves,
+              MapObjectType.shelf => Icons.view_agenda_outlined,
               MapObjectType.wall => Icons.horizontal_rule,
               MapObjectType.entrance => Icons.login,
               MapObjectType.exit => Icons.logout,
