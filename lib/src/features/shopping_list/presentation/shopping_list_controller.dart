@@ -1,7 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../household/presentation/household_controller.dart';
+import '../../auth/domain/auth_repository.dart';
+import '../../auth/presentation/auth_controller.dart';
 import '../../product_categories/domain/product_category_classifier.dart';
 import '../data/in_memory_shopping_list_repository.dart';
 import '../domain/shopping_item.dart';
@@ -22,6 +23,7 @@ final shoppingListControllerProvider =
     Provider.family<ShoppingListController, String>(
   (ref, householdId) => ShoppingListController(
     repository: ref.watch(shoppingListRepositoryProvider),
+    authRepository: ref.watch(authRepositoryProvider),
     householdId: householdId,
   ),
 );
@@ -29,14 +31,17 @@ final shoppingListControllerProvider =
 class ShoppingListController {
   ShoppingListController({
     required ShoppingListRepository repository,
+    required AuthRepository authRepository,
     required String householdId,
   })  : _repository = repository,
+        _authRepository = authRepository,
         _householdId = householdId;
 
   static const _uuid = Uuid();
   static const _categoryClassifier = ProductCategoryClassifier();
 
   final ShoppingListRepository _repository;
+  final AuthRepository _authRepository;
   final String _householdId;
 
   Future<void> add(String name, {String? categoryId}) async {
@@ -45,12 +50,14 @@ class ShoppingListController {
       return;
     }
 
+    final user = _authRepository.currentUser ?? await _authRepository.signIn();
+
     await _repository.addItem(
       _householdId,
       ShoppingItem(
         id: _uuid.v4(),
         name: trimmed,
-        addedByUid: localUserId,
+        addedByUid: user.uid,
         createdAt: DateTime.now(),
         categoryId: categoryId ?? _categoryClassifier.classify(trimmed),
       ),
@@ -74,6 +81,8 @@ class ShoppingListController {
       return;
     }
 
+    final user = _authRepository.currentUser ?? await _authRepository.signIn();
+
     await _repository.updateItem(
       _householdId,
       item.isPurchased
@@ -84,7 +93,7 @@ class ShoppingListController {
             )
           : item.copyWith(
               isPurchased: true,
-              purchasedByUid: localUserId,
+              purchasedByUid: user.uid,
               purchasedAt: DateTime.now(),
             ),
     );
