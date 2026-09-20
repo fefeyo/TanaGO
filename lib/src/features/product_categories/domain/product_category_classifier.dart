@@ -8,7 +8,8 @@ class ProductCategoryClassifier {
     }
 
     for (final rule in _rules) {
-      if (rule.keywords.any(normalized.contains)) {
+      if (rule.exactKeywords.contains(normalized) ||
+          rule.containsKeywords.any(normalized.contains)) {
         return rule.categoryId;
       }
     }
@@ -25,14 +26,19 @@ class ProductCategoryClassifier {
 }
 
 class _CategoryRule {
-  const _CategoryRule(this.categoryId, this.keywords);
+  const _CategoryRule(
+    this.categoryId, {
+    this.containsKeywords = const [],
+    this.exactKeywords = const [],
+  });
 
   final String categoryId;
-  final List<String> keywords;
+  final List<String> containsKeywords;
+  final List<String> exactKeywords;
 }
 
 const _rules = <_CategoryRule>[
-  _CategoryRule('dairy', [
+  _CategoryRule('dairy', containsKeywords: [
     '牛乳',
     'ミルク',
     '卵',
@@ -43,7 +49,7 @@ const _rules = <_CategoryRule>[
     'バター',
     '生クリーム',
   ]),
-  _CategoryRule('meat', [
+  _CategoryRule('meat', containsKeywords: [
     '豚こま',
     '豚肉',
     '豚バラ',
@@ -60,7 +66,7 @@ const _rules = <_CategoryRule>[
     'ウインナー',
     'ソーセージ',
   ]),
-  _CategoryRule('seafood', [
+  _CategoryRule('seafood', containsKeywords: [
     '鮭',
     'サーモン',
     'まぐろ',
@@ -79,7 +85,7 @@ const _rules = <_CategoryRule>[
     'たこ',
     'タコ',
   ]),
-  _CategoryRule('produce', [
+  _CategoryRule('produce', containsKeywords: [
     'キャベツ',
     'レタス',
     '白菜',
@@ -100,14 +106,15 @@ const _rules = <_CategoryRule>[
     'みかん',
     'いちご',
   ]),
-  _CategoryRule('seasonings', [
+  _CategoryRule(
+    'seasonings',
+    exactKeywords: ['塩', '酢'],
+    containsKeywords: [
     'しょうゆ',
     '醤油',
     'みそ',
     '味噌',
-    '塩',
     '砂糖',
-    '酢',
     'みりん',
     '料理酒',
     'マヨネーズ',
@@ -116,28 +123,33 @@ const _rules = <_CategoryRule>[
     'ソース',
     'こしょう',
     '胡椒',
-  ]),
-  _CategoryRule('bakery', [
+    ],
+  ),
+  _CategoryRule('bakery', containsKeywords: [
     '食パン',
     'ロールパン',
     'クロワッサン',
     'ベーグル',
     'パン',
   ]),
-  _CategoryRule('frozen', [
+  _CategoryRule('frozen', containsKeywords: [
     '冷凍',
     'アイス',
   ]),
-  _CategoryRule('beverages', [
-    '水',
-    'お茶',
-    '茶',
+  _CategoryRule(
+    'beverages',
+    exactKeywords: ['水', 'お茶', '麦茶', '緑茶', '紅茶'],
+    containsKeywords: [
     'コーヒー',
     'ジュース',
     '炭酸',
     'スポーツドリンク',
-  ]),
-  _CategoryRule('dry_goods', [
+    ],
+  ),
+  _CategoryRule(
+    'dry_goods',
+    exactKeywords: ['米', 'お米'],
+    containsKeywords: [, containsKeywords: [
     'パスタ',
     'スパゲッティ',
     'うどん',
@@ -145,12 +157,11 @@ const _rules = <_CategoryRule>[
     '蕎麦',
     'そうめん',
     'ラーメン',
-    '米',
-    'お米',
-    '海苔',
+     '海苔',
     'のり',
-  ]),
-  _CategoryRule('snacks', [
+    ],
+  ),
+  _CategoryRule('snacks', containsKeywords: [
     'チョコ',
     'クッキー',
     'ビスケット',
@@ -161,7 +172,7 @@ const _rules = <_CategoryRule>[
     'キャンディ',
     '飴',
   ]),
-  _CategoryRule('prepared_food', [
+  _CategoryRule('prepared_food', containsKeywords: [
     '弁当',
     'お弁当',
     '惣菜',
@@ -171,7 +182,7 @@ const _rules = <_CategoryRule>[
     '天ぷら',
     '寿司',
   ]),
-  _CategoryRule('daily_goods', [
+  _CategoryRule('daily_goods', containsKeywords: [
     'ティッシュ',
     'トイレットペーパー',
     'キッチンペーパー',
