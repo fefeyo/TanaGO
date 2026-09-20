@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../product_categories/domain/product_categories.dart';
 import '../domain/map_object.dart';
 import 'map_editor_controller.dart';
 
@@ -214,6 +215,39 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
                               label: value,
                             );
                       },
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'この棚にある商品カテゴリ',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final category in productCategories)
+                          FilterChip(
+                            label: Text(category.name),
+                            selected: object.categoryIds.contains(category.id),
+                            onSelected: (selected) {
+                              final categoryIds = {
+                                ...object.categoryIds,
+                              };
+                              if (selected) {
+                                categoryIds.add(category.id);
+                              } else {
+                                categoryIds.remove(category.id);
+                              }
+                              ref
+                                  .read(mapEditorProvider.notifier)
+                                  .updateDetails(
+                                    id: object.id,
+                                    categoryIds: categoryIds.toList(),
+                                  );
+                            },
+                          ),
+                      ],
                     ),
                     const SizedBox(height: 16),
                   ],
