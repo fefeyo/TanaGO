@@ -31,4 +31,25 @@ class MapObject {
       type == MapObjectType.entrance ||
       type == MapObjectType.exit ||
       type == MapObjectType.register;
+
+  MapObject copyWith({
+    int? x,
+    int? y,
+    int? width,
+    int? height,
+    String? label,
+    List<String>? categoryIds,
+    bool clearLabel = false,
+  }) {
+    return MapObject(
+      id: id,
+      type: type,
+      x: x ?? this.x,
+      y: y ?? this.y,
+      width: width ?? this.width,
+      height: height ?? this.height,
+      label: clearLabel ? null : label ?? this.label,
+      categoryIds: categoryIds ?? this.categoryIds,
+    );
+  }
 }
