@@ -4,34 +4,36 @@ import 'package:uuid/uuid.dart';
 import '../data/in_memory_map_repository.dart';
 import '../domain/map_object.dart';
 import '../domain/map_repository.dart';
+import '../domain/store_map_key.dart';
 
 final mapRepositoryProvider = Provider<MapRepository>(
   (ref) => InMemoryMapRepository(),
 );
 
-final mapEditorProvider = StreamProvider.family<List<MapObject>, String>(
-  (ref, storeId) => ref.watch(mapRepositoryProvider).watchObjects(storeId),
+final mapEditorProvider =
+    StreamProvider.family<List<MapObject>, StoreMapKey>(
+  (ref, key) => ref.watch(mapRepositoryProvider).watchObjects(key),
 );
 
 final mapEditorControllerProvider =
-    Provider.family<MapEditorController, String>(
-  (ref, storeId) => MapEditorController(
+    Provider.family<MapEditorController, StoreMapKey>(
+  (ref, key) => MapEditorController(
     repository: ref.watch(mapRepositoryProvider),
-    storeId: storeId,
+    key: key,
   ),
 );
 
 class MapEditorController {
   MapEditorController({
     required MapRepository repository,
-    required String storeId,
+    required StoreMapKey key,
   })  : _repository = repository,
-        _storeId = storeId;
+        _key = key;
 
   static const _uuid = Uuid();
 
   final MapRepository _repository;
-  final String _storeId;
+  final StoreMapKey _key;
 
   Future<void> add({
     required MapObjectType type,
@@ -39,7 +41,7 @@ class MapEditorController {
     required int y,
   }) {
     return _repository.saveObject(
-      _storeId,
+      _key,
       MapObject(
         id: _uuid.v4(),
         type: type,
@@ -57,13 +59,8 @@ class MapEditorController {
     required int y,
   }) async {
     final object = await _findObject(id);
-    if (object == null) {
-      return;
-    }
-    await _repository.saveObject(
-      _storeId,
-      object.copyWith(x: x, y: y),
-    );
+    if (object == null) return;
+    await _repository.saveObject(_key, object.copyWith(x: x, y: y));
   }
 
   Future<void> resize({
@@ -72,11 +69,9 @@ class MapEditorController {
     required int height,
   }) async {
     final object = await _findObject(id);
-    if (object == null) {
-      return;
-    }
+    if (object == null) return;
     await _repository.saveObject(
-      _storeId,
+      _key,
       object.copyWith(
         width: width.clamp(1, 12),
         height: height.clamp(1, 16),
@@ -90,11 +85,9 @@ class MapEditorController {
     List<String>? categoryIds,
   }) async {
     final object = await _findObject(id);
-    if (object == null) {
-      return;
-    }
+    if (object == null) return;
     await _repository.saveObject(
-      _storeId,
+      _key,
       object.copyWith(
         label: label,
         categoryIds: categoryIds,
@@ -104,19 +97,17 @@ class MapEditorController {
   }
 
   Future<void> remove(String id) {
-    return _repository.removeObject(_storeId, id);
+    return _repository.removeObject(_key, id);
   }
 
   Future<void> clear() {
-    return _repository.clear(_storeId);
+    return _repository.clear(_key);
   }
 
   Future<MapObject?> _findObject(String id) async {
-    final objects = await _repository.getObjects(_storeId);
+    final objects = await _repository.getObjects(_key);
     for (final object in objects) {
-      if (object.id == id) {
-        return object;
-      }
+      if (object.id == id) return object;
     }
     return null;
   }
