@@ -1,0 +1,69 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+import '../domain/store.dart';
+import '../domain/store_repository.dart';
+
+class FirestoreStoreRepository implements StoreRepository {
+  FirestoreStoreRepository(this._firestore);
+
+  final FirebaseFirestore _firestore;
+
+  CollectionReference<Map<String, dynamic>> _stores(String householdId) {
+    return _firestore
+        .collection('households')
+        .doc(householdId)
+        .collection('stores');
+  }
+
+  @override
+  Stream<List<Store>> watchStores(String householdId) {
+    return _stores(householdId)
+        .orderBy('name')
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map((document) => _fromDocument(householdId, document))
+              .toList(),
+        );
+  }
+
+  @override
+  Future<List<Store>> getStores(String householdId) async {
+    final snapshot = await _stores(householdId).orderBy('name').get();
+    return snapshot.docs
+        .map((document) => _fromDocument(householdId, document))
+        .toList();
+  }
+
+  @override
+  Future<void> addStore(String householdId, Store store) {
+    return _stores(householdId).doc(store.id).set(_toMap(store));
+  }
+
+  @override
+  Future<void> removeStore(String householdId, String storeId) {
+    return _stores(householdId).doc(storeId).delete();
+  }
+
+  Store _fromDocument(
+    String householdId,
+    QueryDocumentSnapshot<Map<String, dynamic>> document,
+  ) {
+    final data = document.data();
+    return Store(
+      id: document.id,
+      householdId: householdId,
+      name: data['name'] as String? ?? '',
+      mapWidth: (data['mapWidth'] as num?)?.toInt() ?? 12,
+      mapHeight: (data['mapHeight'] as num?)?.toInt() ?? 16,
+    );
+  }
+
+  Map<String, dynamic> _toMap(Store store) {
+    return {
+      'name': store.name,
+      'mapWidth': store.mapWidth,
+      'mapHeight': store.mapHeight,
+    };
+  }
+}
