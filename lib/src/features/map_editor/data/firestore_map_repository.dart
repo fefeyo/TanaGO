@@ -44,6 +44,10 @@ class FirestoreMapRepository implements MapRepository {
   @override
   Future<void> clear(StoreMapKey key) async {
     final snapshot = await _objects(key).get();
+    if (snapshot.docs.isEmpty) {
+      return;
+    }
+
     final batch = _firestore.batch();
     for (final document in snapshot.docs) {
       batch.delete(document.reference);
