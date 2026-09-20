@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../household/presentation/household_controller.dart';
 import '../domain/shopping_item.dart';
 
 final shoppingListProvider =
@@ -22,7 +23,12 @@ class ShoppingListController extends Notifier<List<ShoppingItem>> {
 
     state = [
       ...state,
-      ShoppingItem(id: _uuid.v4(), name: trimmed),
+      ShoppingItem(
+        id: _uuid.v4(),
+        name: trimmed,
+        addedByUid: localUserId,
+        createdAt: DateTime.now(),
+      ),
     ];
   }
 
@@ -30,7 +36,17 @@ class ShoppingListController extends Notifier<List<ShoppingItem>> {
     state = [
       for (final item in state)
         if (item.id == id)
-          item.copyWith(isPurchased: !item.isPurchased)
+          item.isPurchased
+              ? item.copyWith(
+                  isPurchased: false,
+                  clearPurchasedByUid: true,
+                  clearPurchasedAt: true,
+                )
+              : item.copyWith(
+                  isPurchased: true,
+                  purchasedByUid: localUserId,
+                  purchasedAt: DateTime.now(),
+                )
         else
           item,
     ];
