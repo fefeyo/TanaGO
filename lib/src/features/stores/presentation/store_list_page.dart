@@ -11,7 +11,7 @@ class StoreListPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final household = ref.watch(householdProvider);
+    final household = ref.watch(householdProvider).valueOrNull!;
     final storesAsync = ref.watch(storesProvider(household.id));
     final stores = storesAsync.valueOrNull ?? const <Store>[];
 
