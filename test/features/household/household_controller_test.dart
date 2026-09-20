@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tanago/src/features/auth/presentation/auth_controller.dart';
 import 'package:tanago/src/features/household/presentation/household_controller.dart';
 
 void main() {
@@ -13,14 +14,15 @@ void main() {
     expect(household.name, 'わが家');
 
     final repository = container.read(householdRepositoryProvider);
+    final user = container.read(authRepositoryProvider).currentUser!;
     final current = await repository
-        .watchCurrentHousehold(localUserId)
+        .watchCurrentHousehold(user.uid)
         .first;
     expect(current?.id, household.id);
 
     final members = await repository.watchMembers(household.id).first;
     expect(members, hasLength(1));
-    expect(members.single.uid, localUserId);
+    expect(members.single.uid, user.uid);
   });
 
   test('rejects blank household name and invite code', () async {
