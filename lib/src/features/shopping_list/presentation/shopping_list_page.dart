@@ -28,7 +28,7 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
   @override
   Widget build(BuildContext context) {
     final household = ref.watch(householdProvider);
-    final items = ref.watch(shoppingListProvider);
+    final items = ref.watch(shoppingListProvider(household.id));
 
     return Scaffold(
       appBar: AppBar(
@@ -196,7 +196,7 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
   }
 
   void _addItem() {
-    ref.read(shoppingListProvider.notifier).add(_controller.text);
+    ref.read(shoppingListProvider(ref.read(householdProvider).id).notifier).add(_controller.text);
     _controller.clear();
     setState(() {});
   }
