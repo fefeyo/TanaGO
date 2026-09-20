@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../map_editor/domain/map_object.dart';
 import '../../map_editor/presentation/map_editor_controller.dart';
+import '../../household/presentation/household_controller.dart';
 import '../../shopping_list/domain/shopping_item.dart';
 import '../../shopping_list/presentation/shopping_list_controller.dart';
 import '../domain/shopping_map_matcher.dart';
@@ -27,8 +28,9 @@ class _ShoppingMapPageState extends ConsumerState<ShoppingMapPage> {
 
   @override
   Widget build(BuildContext context) {
+    final household = ref.watch(householdProvider);
     final objects = ref.watch(mapEditorProvider(widget.storeId));
-    final shoppingItems = ref.watch(shoppingListProvider);
+    final shoppingItems = ref.watch(shoppingListProvider(household.id));
     final pendingItems = shoppingItems
         .where((item) => !item.isPurchased && item.categoryId != null)
         .toList();
@@ -141,7 +143,7 @@ class _ShoppingMapPageState extends ConsumerState<ShoppingMapPage> {
               items: selectedItems,
               hasRequiredShelves: highlightedShelfIds.isNotEmpty,
               onTogglePurchased: (id) => ref
-                  .read(shoppingListProvider.notifier)
+                  .read(shoppingListProvider(household.id).notifier)
                   .togglePurchased(id),
             ),
           ],
