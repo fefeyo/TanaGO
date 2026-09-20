@@ -15,6 +15,11 @@ class InMemoryShoppingListRepository implements ShoppingListRepository {
   }
 
   @override
+  Future<List<ShoppingItem>> getItems(String householdId) async {
+    return List.unmodifiable(_items[householdId] ?? const []);
+  }
+
+  @override
   Future<void> addItem(String householdId, ShoppingItem item) async {
     final items = [...?_items[householdId], item];
     _items[householdId] = items;
