@@ -14,6 +14,11 @@ class InMemoryMapRepository implements MapRepository {
   }
 
   @override
+  Future<List<MapObject>> getObjects(String storeId) async {
+    return List.unmodifiable(_objects[storeId] ?? const []);
+  }
+
+  @override
   Future<void> saveObject(String storeId, MapObject object) async {
     final current = _objects[storeId] ?? const <MapObject>[];
     final exists = current.any((item) => item.id == object.id);
