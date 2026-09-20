@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../household/presentation/household_controller.dart';
 import '../../product_categories/domain/product_categories.dart';
+import '../../product_categories/domain/product_category_classifier.dart';
 import 'shopping_list_controller.dart';
 
 class ShoppingListPage extends ConsumerStatefulWidget {
@@ -14,6 +15,8 @@ class ShoppingListPage extends ConsumerStatefulWidget {
 }
 
 class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
+  static const _categoryClassifier = ProductCategoryClassifier();
+
   final _controller = TextEditingController();
 
   @override
@@ -51,11 +54,13 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
                   Expanded(
                     child: TextField(
                       controller: _controller,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: '買ってきてほしいもの',
                         hintText: '例: 牛乳',
-                        border: OutlineInputBorder(),
+                        helperText: _categoryHelperText(),
+                        border: const OutlineInputBorder(),
                       ),
+                      onChanged: (_) => setState(() {}),
                       onSubmitted: (_) => _addItem(),
                     ),
                   ),
@@ -130,6 +135,16 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
     );
   }
 
+  String? _categoryHelperText() {
+    final categoryId = _categoryClassifier.classify(_controller.text);
+    if (categoryId == null) {
+      return null;
+    }
+
+    final category = productCategoryById(categoryId);
+    return category == null ? null : '自動判定: ${category.name}';
+  }
+
   String _itemSubtitle(bool isPurchased, String? categoryId) {
     final category = productCategoryById(categoryId);
     final status = isPurchased ? '購入済み' : 'あなたが追加';
@@ -183,5 +198,6 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
   void _addItem() {
     ref.read(shoppingListProvider.notifier).add(_controller.text);
     _controller.clear();
+    setState(() {});
   }
 }
