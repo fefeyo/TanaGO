@@ -87,7 +87,7 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
                           return Dismissible(
                             key: ValueKey(item.id),
                             onDismissed: (_) => ref
-                                .read(shoppingListProvider.notifier)
+                                .read(shoppingListProvider(ref.read(householdProvider).id).notifier)
                                 .remove(item.id),
                             child: CheckboxListTile(
                               value: item.isPurchased,
@@ -111,7 +111,7 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
                                 ),
                               ),
                               onChanged: (_) => ref
-                                  .read(shoppingListProvider.notifier)
+                                  .read(shoppingListProvider(ref.read(householdProvider).id).notifier)
                                   .togglePurchased(item.id),
                             ),
                           );
@@ -190,7 +190,7 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
 
     if (categoryId != null) {
       ref
-          .read(shoppingListProvider.notifier)
+          .read(shoppingListProvider(ref.read(householdProvider).id).notifier)
           .updateCategory(itemId, categoryId);
     }
   }
