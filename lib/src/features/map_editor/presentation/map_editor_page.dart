@@ -24,7 +24,8 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
 
   @override
   Widget build(BuildContext context) {
-    final objects = ref.watch(mapEditorProvider(widget.storeId));
+    final objectsAsync = ref.watch(mapEditorProvider(widget.storeId));
+    final objects = objectsAsync.valueOrNull ?? const <MapObject>[];
 
     return Scaffold(
       appBar: AppBar(
@@ -35,7 +36,7 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
             onPressed: objects.isEmpty
                 ? null
                 : () {
-                    ref.read(mapEditorProvider(widget.storeId).notifier).clear();
+                    ref.read(mapEditorControllerProvider(widget.storeId)).clear();
                     setState(() => _selectedObjectId = null);
                   },
             icon: const Icon(Icons.delete_sweep_outlined),
@@ -75,7 +76,7 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
                                   (details.localPosition.dy / cellSize).floor();
                               final x = rawX.clamp(0, _columns - width);
 
-                              ref.read(mapEditorProvider(widget.storeId).notifier).add(
+                              ref.read(mapEditorControllerProvider(widget.storeId)).add(
                                     type: _selectedType,
                                     x: x,
                                     y: y.clamp(0, _rows - 1),
@@ -122,7 +123,7 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
                                     .round()
                                     .clamp(0, _rows - object.height);
 
-                                ref.read(mapEditorProvider(widget.storeId).notifier).move(
+                                ref.read(mapEditorControllerProvider(widget.storeId)).move(
                                       id: object.id,
                                       x: x,
                                       y: y,
@@ -164,8 +165,9 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
 
   Future<void> _showObjectEditor(String objectId) async {
     final initialObject = ref
-        .read(mapEditorProvider)
-        .where((object) => object.id == objectId)
+        .read(mapEditorProvider(widget.storeId))
+        .valueOrNull
+        ?.where((object) => object.id == objectId)
         .firstOrNull;
     if (initialObject == null) return;
 
@@ -179,8 +181,9 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
         return Consumer(
           builder: (context, ref, child) {
             final object = ref
-                .watch(mapEditorProvider)
-                .where((object) => object.id == objectId)
+                .watch(mapEditorProvider(widget.storeId))
+                .valueOrNull
+                ?.where((object) => object.id == objectId)
                 .firstOrNull;
             if (object == null) return const SizedBox.shrink();
 
@@ -210,7 +213,7 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
                       ),
                       textInputAction: TextInputAction.done,
                       onSubmitted: (value) {
-                        ref.read(mapEditorProvider(widget.storeId).notifier).updateDetails(
+                        ref.read(mapEditorControllerProvider(widget.storeId)).updateDetails(
                               id: object.id,
                               label: value,
                             );
@@ -240,7 +243,7 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
                                 categoryIds.remove(category.id);
                               }
                               ref
-                                  .read(mapEditorProvider.notifier)
+                                  .read(mapEditorControllerProvider(widget.storeId))
                                   .updateDetails(
                                     id: object.id,
                                     categoryIds: categoryIds.toList(),
@@ -255,7 +258,7 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
                     width: object.width,
                     height: object.height,
                     onResize: (width, height) {
-                      ref.read(mapEditorProvider(widget.storeId).notifier).resize(
+                      ref.read(mapEditorControllerProvider(widget.storeId)).resize(
                             id: object.id,
                             width: width.clamp(1, _columns - object.x),
                             height: height.clamp(1, _rows - object.y),
@@ -267,7 +270,7 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
                     children: [
                       TextButton.icon(
                         onPressed: () {
-                          ref.read(mapEditorProvider(widget.storeId).notifier).remove(object.id);
+                          ref.read(mapEditorControllerProvider(widget.storeId)).remove(object.id);
                           Navigator.of(context).pop();
                         },
                         icon: const Icon(Icons.delete_outline),
@@ -277,7 +280,7 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
                       FilledButton(
                         onPressed: () {
                           if (object.type == MapObjectType.shelf) {
-                            ref.read(mapEditorProvider(widget.storeId).notifier).updateDetails(
+                            ref.read(mapEditorControllerProvider(widget.storeId)).updateDetails(
                                   id: object.id,
                                   label: labelController.text.trim(),
                                 );
@@ -319,7 +322,7 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
     );
 
     if (shouldDelete == true) {
-      ref.read(mapEditorProvider(widget.storeId).notifier).remove(object.id);
+      ref.read(mapEditorControllerProvider(widget.storeId)).remove(object.id);
       if (_selectedObjectId == object.id) {
         setState(() => _selectedObjectId = null);
       }
