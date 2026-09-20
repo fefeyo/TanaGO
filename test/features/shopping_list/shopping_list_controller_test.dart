@@ -3,72 +3,60 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tanago/src/features/shopping_list/presentation/shopping_list_controller.dart';
 
 void main() {
-  test('adds, toggles, and removes shopping items', () {
+  test('adds, categorizes, toggles, and removes shopping items', () async {
     final container = ProviderContainer();
     addTearDown(container.dispose);
 
-    final controller = container.read(shoppingListProvider('household-a').notifier);
+    final controller =
+        container.read(shoppingListControllerProvider('household-a'));
+    final repository = container.read(shoppingListRepositoryProvider);
 
-    controller.add('牛乳');
-    expect(container.read(shoppingListProvider('household-a')), hasLength(1));
-    expect(container.read(shoppingListProvider('household-a')).single.name, '牛乳');
-    expect(container.read(shoppingListProvider('household-a')).single.categoryId, 'dairy');
+    await controller.add('牛乳');
+    var items = await repository.getItems('household-a');
+    expect(items.single.name, '牛乳');
+    expect(items.single.categoryId, 'dairy');
 
-    final id = container.read(shoppingListProvider('household-a')).single.id;
-    controller.updateCategory(id, 'beverages');
-    expect(
-      container.read(shoppingListProvider('household-a')).single.categoryId,
-      'beverages',
-    );
+    final id = items.single.id;
+    await controller.updateCategory(id, 'beverages');
+    await controller.togglePurchased(id);
 
-    controller.togglePurchased(id);
-    expect(container.read(shoppingListProvider('household-a')).single.isPurchased, isTrue);
+    items = await repository.getItems('household-a');
+    expect(items.single.categoryId, 'beverages');
+    expect(items.single.isPurchased, isTrue);
 
-    controller.remove(id);
-    expect(container.read(shoppingListProvider('household-a')), isEmpty);
+    await controller.remove(id);
+    expect(await repository.getItems('household-a'), isEmpty);
   });
 
-  test('keeps category empty when it cannot classify an item', () {
+  test('keeps unknown category empty and explicit category wins', () async {
     final container = ProviderContainer();
     addTearDown(container.dispose);
 
-    container.read(shoppingListProvider('household-a').notifier).add('いつものやつ');
+    final controller =
+        container.read(shoppingListControllerProvider('household-a'));
+    final repository = container.read(shoppingListRepositoryProvider);
 
-    expect(container.read(shoppingListProvider('household-a')).single.categoryId, isNull);
+    await controller.add('いつものやつ');
+    await controller.add('牛乳', categoryId: 'beverages');
+
+    final items = await repository.getItems('household-a');
+    expect(items[0].categoryId, isNull);
+    expect(items[1].categoryId, 'beverages');
   });
 
-  test('explicit category overrides automatic classification', () {
+  test('keeps shopping items isolated per household', () async {
     final container = ProviderContainer();
     addTearDown(container.dispose);
 
-    container
-        .read(shoppingListProvider('household-a').notifier)
-        .add('牛乳', categoryId: 'beverages');
-
-    expect(
-      container.read(shoppingListProvider('household-a')).single.categoryId,
-      'beverages',
-    );
-  });
-
-  test('keeps shopping items isolated per household', () {
-    final container = ProviderContainer();
-    addTearDown(container.dispose);
-
-    container
-        .read(shoppingListProvider('household-a').notifier)
+    await container
+        .read(shoppingListControllerProvider('household-a'))
         .add('牛乳');
-    container
-        .read(shoppingListProvider('household-b').notifier)
+    await container
+        .read(shoppingListControllerProvider('household-b'))
         .add('しょうゆ');
 
-    expect(
-      container.read(shoppingListProvider('household-a')).single.name,
-      '牛乳',
-    );
-    expect(
-      container.read(shoppingListProvider('household-b')).single.name,
-      'しょうゆ',
-    );
+    final repository = container.read(shoppingListRepositoryProvider);
+    expect((await repository.getItems('household-a')).single.name, '牛乳');
+    expect((await repository.getItems('household-b')).single.name, 'しょうゆ');
   });
 }
