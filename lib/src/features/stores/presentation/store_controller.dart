@@ -1,43 +1,57 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
+import '../data/in_memory_store_repository.dart';
 import '../domain/store.dart';
+import '../domain/store_repository.dart';
 
-final storesProvider =
-    NotifierProvider.family<StoreController, List<Store>, String>(
-  StoreController.new,
+final storeRepositoryProvider = Provider<StoreRepository>(
+  (ref) => InMemoryStoreRepository(),
 );
 
-class StoreController extends FamilyNotifier<List<Store>, String> {
+final storesProvider = StreamProvider.family<List<Store>, String>(
+  (ref, householdId) =>
+      ref.watch(storeRepositoryProvider).watchStores(householdId),
+);
+
+final storeControllerProvider = Provider.family<StoreController, String>(
+  (ref, householdId) => StoreController(
+    repository: ref.watch(storeRepositoryProvider),
+    householdId: householdId,
+  ),
+);
+
+class StoreController {
+  StoreController({
+    required StoreRepository repository,
+    required String householdId,
+  })  : _repository = repository,
+        _householdId = householdId;
+
   static const _uuid = Uuid();
 
-  late final String householdId;
+  final StoreRepository _repository;
+  final String _householdId;
 
-  @override
-  List<Store> build(String arg) {
-    householdId = arg;
-    return const [];
-  }
-
-  void add(String name) {
+  Future<void> add(String name) async {
     final trimmed = name.trim();
     if (trimmed.isEmpty) {
       return;
     }
 
-    state = [
-      ...state,
+    await _repository.addStore(
+      _householdId,
       Store(
         id: _uuid.v4(),
-        householdId: householdId,
+        householdId: _householdId,
         name: trimmed,
         mapWidth: 12,
         mapHeight: 16,
       ),
-    ];
+    );
   }
 
-  void remove(String id) {
-    state = state.where((store) => store.id != id).toList();
+  Future<void> remove(String id) {
+    return _repository.removeStore(_householdId, id);
   }
 }
