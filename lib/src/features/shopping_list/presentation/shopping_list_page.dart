@@ -35,6 +35,13 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('TanaGO'),
+        actions: [
+          IconButton(
+            tooltip: 'わが家',
+            onPressed: () => context.push('/household'),
+            icon: const Icon(Icons.group_outlined),
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(32),
           child: Padding(
