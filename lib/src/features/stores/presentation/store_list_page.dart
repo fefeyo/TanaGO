@@ -33,8 +33,13 @@ class StoreListPage extends ConsumerWidget {
                   child: ListTile(
                     leading: const Icon(Icons.storefront),
                     title: Text(store.name),
-                    subtitle: const Text('店内マップを編集'),
-                    trailing: const Icon(Icons.chevron_right),
+                    subtitle: const Text('店内マップで売り場を確認'),
+                    trailing: IconButton(
+                      tooltip: '店内マップを編集',
+                      onPressed: () =>
+                          context.push('/stores/${store.id}/map/edit'),
+                      icon: const Icon(Icons.edit_outlined),
+                    ),
                     onTap: () => context.push('/stores/${store.id}/map'),
                   ),
                 );
