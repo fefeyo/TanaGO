@@ -31,7 +31,7 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
 
   @override
   Widget build(BuildContext context) {
-    final household = ref.watch(householdProvider);
+    final household = ref.watch(householdProvider).valueOrNull!;
     final mapKey = StoreMapKey(
       householdId: household.id,
       storeId: widget.storeId,
