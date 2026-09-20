@@ -28,7 +28,7 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
 
   @override
   Widget build(BuildContext context) {
-    final household = ref.watch(householdProvider);
+    final household = ref.watch(householdProvider).valueOrNull!;
     final itemsAsync = ref.watch(shoppingListProvider(household.id));
     final items = itemsAsync.valueOrNull ?? const <ShoppingItem>[];
 
