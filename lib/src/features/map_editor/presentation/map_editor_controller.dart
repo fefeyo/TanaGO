@@ -32,11 +32,58 @@ class MapEditorController extends Notifier<List<MapObject>> {
     ];
   }
 
+  void move({
+    required String id,
+    required int x,
+    required int y,
+  }) {
+    _update(id, (object) => object.copyWith(x: x, y: y));
+  }
+
+  void resize({
+    required String id,
+    required int width,
+    required int height,
+  }) {
+    _update(
+      id,
+      (object) => object.copyWith(
+        width: width.clamp(1, 12),
+        height: height.clamp(1, 16),
+      ),
+    );
+  }
+
+  void updateDetails({
+    required String id,
+    String? label,
+    List<String>? categoryIds,
+  }) {
+    _update(
+      id,
+      (object) => object.copyWith(
+        label: label,
+        categoryIds: categoryIds,
+        clearLabel: label != null && label.trim().isEmpty,
+      ),
+    );
+  }
+
   void remove(String id) {
     state = state.where((object) => object.id != id).toList();
   }
 
   void clear() {
     state = const [];
+  }
+
+  void _update(
+    String id,
+    MapObject Function(MapObject object) transform,
+  ) {
+    state = [
+      for (final object in state)
+        if (object.id == id) transform(object) else object,
+    ];
   }
 }
