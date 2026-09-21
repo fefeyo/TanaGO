@@ -1,12 +1,13 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
-import '../data/in_memory_store_repository.dart';
+import '../data/firestore_store_repository.dart';
 import '../domain/store.dart';
 import '../domain/store_repository.dart';
 
 final storeRepositoryProvider = Provider<StoreRepository>(
-  (ref) => InMemoryStoreRepository(),
+  (ref) => FirestoreStoreRepository(FirebaseFirestore.instance),
 );
 
 final storesProvider = StreamProvider.family<List<Store>, String>(
