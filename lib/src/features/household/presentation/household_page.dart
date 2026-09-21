@@ -24,7 +24,10 @@ class HouseholdPage extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Text(household.name, style: Theme.of(context).textTheme.headlineSmall),
+          Text(
+            household.name,
+            style: Theme.of(context).textTheme.headlineSmall,
+          ),
           const SizedBox(height: 8),
           Text('${members.length}人で共有中'),
           const SizedBox(height: 24),

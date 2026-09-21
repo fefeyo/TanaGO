@@ -88,7 +88,9 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
                                   (details.localPosition.dy / cellSize).floor();
                               final x = rawX.clamp(0, _columns - width);
 
-                              ref.read(mapEditorControllerProvider(_mapKey)).add(
+                              ref
+                                  .read(mapEditorControllerProvider(_mapKey))
+                                  .add(
                                     type: _selectedType,
                                     x: x,
                                     y: y.clamp(0, _rows - 1),
@@ -135,7 +137,9 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
                                     .round()
                                     .clamp(0, _rows - object.height);
 
-                                ref.read(mapEditorControllerProvider(_mapKey)).move(
+                                ref
+                                    .read(mapEditorControllerProvider(_mapKey))
+                                    .move(
                                       id: object.id,
                                       x: x,
                                       y: y,
@@ -183,7 +187,8 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
         .firstOrNull;
     if (initialObject == null) return;
 
-    final labelController = TextEditingController(text: initialObject.label ?? '');
+    final labelController =
+        TextEditingController(text: initialObject.label ?? '');
 
     await showModalBottomSheet<void>(
       context: context,
@@ -225,7 +230,9 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
                       ),
                       textInputAction: TextInputAction.done,
                       onSubmitted: (value) {
-                        ref.read(mapEditorControllerProvider(_mapKey)).updateDetails(
+                        ref
+                            .read(mapEditorControllerProvider(_mapKey))
+                            .updateDetails(
                               id: object.id,
                               label: value,
                             );
@@ -282,7 +289,9 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
                     children: [
                       TextButton.icon(
                         onPressed: () {
-                          ref.read(mapEditorControllerProvider(_mapKey)).remove(object.id);
+                          ref
+                              .read(mapEditorControllerProvider(_mapKey))
+                              .remove(object.id);
                           Navigator.of(context).pop();
                         },
                         icon: const Icon(Icons.delete_outline),
@@ -292,7 +301,9 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
                       FilledButton(
                         onPressed: () {
                           if (object.type == MapObjectType.shelf) {
-                            ref.read(mapEditorControllerProvider(_mapKey)).updateDetails(
+                            ref
+                                .read(mapEditorControllerProvider(_mapKey))
+                                .updateDetails(
                                   id: object.id,
                                   label: labelController.text.trim(),
                                 );
@@ -484,8 +495,7 @@ class _MapObjectTile extends StatelessWidget {
       MapObjectType.shelf => Theme.of(context).colorScheme.primaryContainer,
       MapObjectType.wall =>
         Theme.of(context).colorScheme.surfaceContainerHighest,
-      MapObjectType.entrance =>
-        Theme.of(context).colorScheme.tertiaryContainer,
+      MapObjectType.entrance => Theme.of(context).colorScheme.tertiaryContainer,
       MapObjectType.exit => Theme.of(context).colorScheme.tertiaryContainer,
       MapObjectType.register =>
         Theme.of(context).colorScheme.secondaryContainer,

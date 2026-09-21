@@ -85,7 +85,7 @@ class _HouseholdSetupPageState extends ConsumerState<HouseholdSetupPage> {
               textCapitalization: TextCapitalization.characters,
               decoration: const InputDecoration(
                 labelText: '招待コード',
-                hintText: 'TANA-7K2P',
+                hintText: 'コピーした TANA-… のコード',
                 border: OutlineInputBorder(),
               ),
               onSubmitted: (_) => _joinHousehold(),
@@ -115,6 +115,7 @@ class _HouseholdSetupPageState extends ConsumerState<HouseholdSetupPage> {
   }
 
   Future<void> _submit(Future<void> Function() action) async {
+    if (_isSubmitting) return;
     setState(() => _isSubmitting = true);
     try {
       await action();

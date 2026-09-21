@@ -1,0 +1,143 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function userPath(uid) { return /databases/$(database)/documents/users/$(uid); }
+    function householdPath(hid) { return /databases/$(database)/documents/households/$(hid); }
+    function memberPath(hid, uid) { return /databases/$(database)/documents/households/$(hid)/members/$(uid); }
+    function invitePath(code) { return /databases/$(database)/documents/householdInvites/$(code); }
+    function member(hid) {
+      return signedIn() && exists(memberPath(hid, request.auth.uid));
+    }
+    function owner(hid) {
+      return member(hid) && get(memberPath(hid, request.auth.uid)).data.role == 'owner';
+    }
+    function unassigned(uid) {
+      return !exists(userPath(uid)) || get(userPath(uid)).data.get('householdId', null) == null;
+    }
+    function text(value, max) { return value is string && value.size() > 0 && value.size() <= max; }
+    function validCode(code) { return code is string && code.matches('^TANA-[0-9A-F]{32}$'); }
+    function categories() {
+      return ['produce', 'meat', 'seafood', 'dairy', 'frozen', 'bakery', 'snacks',
+              'beverages', 'dry_goods', 'seasonings', 'prepared_food', 'daily_goods'];
+    }
+    match /users/{uid} {
+      allow get: if signedIn() && request.auth.uid == uid;
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['householdId'])
+        && text(request.resource.data.householdId, 128)
+        && getAfter(memberPath(request.resource.data.householdId, uid)).data.role in ['owner', 'member'];
+      allow update: if signedIn() && request.auth.uid == uid
+        && unassigned(uid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['householdId'])
+        && text(request.resource.data.householdId, 128)
+        && getAfter(memberPath(request.resource.data.householdId, uid)).data.role in ['owner', 'member'];
+    }
+    match /householdInvites/{code} {
+      // Exact-code lookups only, including a lookup of an unused random code.
+      // This document contains no names, member lists, or other household data.
+      allow get: if signedIn() && validCode(code);
+      allow create: if signedIn() && validCode(code)
+        && request.resource.data.keys().hasOnly(['householdId'])
+        && text(request.resource.data.householdId, 128)
+        && !exists(householdPath(request.resource.data.householdId))
+        && getAfter(householdPath(request.resource.data.householdId)).data.createdByUid == request.auth.uid
+        && getAfter(householdPath(request.resource.data.householdId)).data.inviteCode == code;
+      // No list/update/delete API until invite management exists.
+    }
+    match /households/{hid} {
+      allow get: if member(hid);
+      allow create: if signedIn() && unassigned(request.auth.uid)
+        && request.resource.data.keys().hasOnly(['name', 'createdByUid', 'inviteCode', 'createdAt'])
+        && text(request.resource.data.name, 100)
+        && request.resource.data.createdByUid == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && validCode(request.resource.data.inviteCode)
+        && getAfter(memberPath(hid, request.auth.uid)).data.role == 'owner'
+        && getAfter(userPath(request.auth.uid)).data.householdId == hid
+        && getAfter(invitePath(request.resource.data.inviteCode)).data.householdId == hid;
+      allow update: if owner(hid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name'])
+        && text(request.resource.data.name, 100);
+      match /members/{uid} {
+        allow read: if member(hid);
+        allow create: if signedIn() && request.auth.uid == uid && unassigned(uid)
+          && text(request.resource.data.displayName, 100)
+          && request.resource.data.joinedAt == request.time
+          && getAfter(userPath(uid)).data.householdId == hid
+          && (
+            (request.resource.data.keys().hasOnly(['displayName', 'role', 'joinedAt'])
+              && request.resource.data.role == 'owner'
+              && !exists(householdPath(hid))
+              && getAfter(householdPath(hid)).data.createdByUid == uid)
+            ||
+            (request.resource.data.keys().hasOnly(['displayName', 'role', 'joinedAt', 'inviteCode'])
+              && request.resource.data.role == 'member'
+              && validCode(request.resource.data.inviteCode)
+              && get(invitePath(request.resource.data.inviteCode)).data.householdId == hid
+              && get(householdPath(hid)).data.inviteCode == request.resource.data.inviteCode)
+          );
+        // Role changes, member deletion and moving households are not MVP APIs.
+      }
+      match /shoppingLists/{listId} {
+        allow read: if member(hid) && listId == 'active';
+        match /items/{itemId} {
+          function validItem() {
+            let d = request.resource.data;
+            return d.keys().hasAll(['name', 'addedByUid', 'createdAt', 'categoryId', 'isPurchased', 'purchasedByUid', 'purchasedAt'])
+              && d.keys().hasOnly(['name', 'addedByUid', 'createdAt', 'categoryId', 'isPurchased', 'purchasedByUid', 'purchasedAt'])
+              && text(d.name, 200) && text(d.addedByUid, 128) && d.createdAt is timestamp
+              && (d.categoryId == null || d.categoryId in categories())
+              && d.isPurchased is bool
+              && ((d.isPurchased && text(d.purchasedByUid, 128) && d.purchasedAt is timestamp)
+                || (!d.isPurchased && d.purchasedByUid == null && d.purchasedAt == null));
+          }
+          allow read, delete: if member(hid) && listId == 'active';
+          allow create: if member(hid) && listId == 'active' && validItem()
+            && request.resource.data.addedByUid == request.auth.uid
+            && request.resource.data.isPurchased == false;
+          allow update: if member(hid) && listId == 'active' && validItem()
+            && request.resource.data.addedByUid == resource.data.addedByUid
+            && request.resource.data.createdAt == resource.data.createdAt
+            && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['isPurchased', 'purchasedByUid', 'purchasedAt'])
+              || !request.resource.data.isPurchased
+              || request.resource.data.purchasedByUid == request.auth.uid);
+        }
+      }
+      match /stores/{sid} {
+        function validStore() {
+          let d = request.resource.data;
+          return d.keys().hasOnly(['name', 'mapWidth', 'mapHeight', 'deleting'])
+            && text(d.name, 100) && d.mapWidth is int && d.mapHeight is int
+            && d.mapWidth > 0 && d.mapWidth <= 100 && d.mapHeight > 0 && d.mapHeight <= 100
+            && d.get('deleting', false) is bool;
+        }
+        allow read: if member(hid);
+        allow create: if member(hid) && validStore() && request.resource.data.get('deleting', false) == false;
+        allow update: if member(hid) && validStore()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleting'])
+          && request.resource.data.deleting == true;
+        allow delete: if member(hid) && (resource == null || resource.data.get('deleting', false) == true);
+        match /mapObjects/{objectId} {
+          function validObject() {
+            let d = request.resource.data;
+            let store = getAfter(/databases/$(database)/documents/households/$(hid)/stores/$(sid)).data;
+            return store.get('deleting', false) == false
+              && d.keys().hasAll(['type', 'x', 'y', 'width', 'height', 'label', 'categoryIds'])
+              && d.keys().hasOnly(['type', 'x', 'y', 'width', 'height', 'label', 'categoryIds'])
+              && d.type in ['shelf', 'wall', 'entrance', 'exit', 'register']
+              && d.x is int && d.y is int && d.width is int && d.height is int
+              && d.x >= 0 && d.y >= 0 && d.width > 0 && d.height > 0
+              && d.x + d.width <= store.mapWidth && d.y + d.height <= store.mapHeight
+              && (d.label == null || (d.label is string && d.label.size() <= 100))
+              && d.categoryIds is list && d.categoryIds.size() <= 12
+              && d.categoryIds.hasOnly(categories())
+              && (d.type == 'shelf' || d.categoryIds.size() == 0);
+          }
+          allow read, delete: if member(hid);
+          allow create, update: if member(hid) && validObject();
+        }
+      }
+    }
+  }
+}

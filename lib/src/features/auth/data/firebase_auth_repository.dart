@@ -7,6 +7,7 @@ class FirebaseAuthRepository implements AuthRepository {
   FirebaseAuthRepository(this._auth);
 
   final FirebaseAuth _auth;
+  Future<AppUser>? _signInInFlight;
 
   @override
   AppUser? get currentUser => _mapUser(_auth.currentUser);
@@ -17,18 +18,32 @@ class FirebaseAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<AppUser> signIn() async {
-    final current = _auth.currentUser;
-    if (current != null) {
-      return _mapUser(current)!;
-    }
+  Future<AppUser> signIn() {
+    final current = currentUser;
+    if (current != null) return Future.value(current);
+    return _signInInFlight ??= _signInAnonymously();
+  }
 
-    final credential = await _auth.signInAnonymously();
-    return _mapUser(credential.user)!;
+  Future<AppUser> _signInAnonymously() async {
+    try {
+      final credential = await _auth.signInAnonymously();
+      final user = _mapUser(credential.user);
+      if (user == null) throw StateError('認証情報を取得できませんでした');
+      return user;
+    } finally {
+      _signInInFlight = null;
+    }
   }
 
   @override
-  Future<void> signOut() => _auth.signOut();
+  Future<void> signOut() async {
+    // A delayed anonymous sign-in must not undo an explicit sign-out.
+    try {
+      await _signInInFlight;
+    } finally {
+      await _auth.signOut();
+    }
+  }
 
   AppUser? _mapUser(User? user) {
     if (user == null) return null;

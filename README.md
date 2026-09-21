@@ -24,7 +24,7 @@ Someone at home adds what they want bought. The person going shopping checks the
 
 ## Current implementation
 
-The repository currently contains the app foundation before Firebase project configuration:
+The app uses Firebase Authentication (anonymous sessions) and Cloud Firestore in production:
 
 - household-aware shopping lists and stores
 - automatic product-category classification with manual correction
@@ -33,9 +33,9 @@ The repository currently contains the app foundation before Firebase project con
 - shopping map with highlighted required shelves
 - selected-shelf item panel
 - repository contracts for shopping lists, stores, and maps
-- in-memory repository implementations used by the app today
+- in-memory repository implementations used by unit tests
 - authentication abstraction with local and Firebase Auth adapters
-- Firestore repository adapters prepared for the final Firebase connection
+- Firestore repository adapters with transactional edits and membership-based security rules
 - unit tests for household/store isolation and shopping-map matching
 
 ## Data boundaries
@@ -46,22 +46,25 @@ Application state is scoped so data from different households and stores cannot 
 - stores: `householdId`
 - store map: `householdId + storeId`
 
-The planned Firestore hierarchy is:
+The Firestore hierarchy is:
 
 ```text
+users/{uid}
+householdInvites/{inviteCode}
 households/{householdId}
+  members/{uid}
   shoppingLists/active
     items/{itemId}
   stores/{storeId}
     mapObjects/{mapObjectId}
 ```
 
-Household members will also live under the household when authentication and invitations are connected.
+Household creation and invitation joins atomically bind users to membership documents. Invite lookups do not expose household documents to non-members.
 
 ## Architecture
 
 Feature-oriented structure under `lib/src/features`.
 
-Presentation code depends on repository contracts instead of Firestore directly. The current providers use in-memory repositories, while Firestore implementations live in each feature's `data` layer. Once Firebase configuration is available, the repository providers can be switched to the Firestore implementations without changing the screens or feature controllers.
+Presentation code depends on repository contracts instead of Firestore directly. Production providers use Firebase/Firestore; tests override them with in-memory implementations. Firebase initialization happens in `main.dart`, and authentication bootstrap precedes household loading.
 
-Firebase initialization, security rules, and the provider switch from the in-memory adapters to Firebase Auth / Firestore will be connected after the Firebase project configuration is available.
+See [Firebase setup, security model, existing-data migration and tests](docs/firebase-security.md) before deploying the rules. Existing short invite codes must be migrated alongside the app update.

@@ -16,9 +16,7 @@ void main() {
     final container = createContainer();
     addTearDown(container.dispose);
 
-    await container
-        .read(storeControllerProvider('household-a'))
-        .add('スーパーA');
+    await container.read(storeControllerProvider('household-a')).add('スーパーA');
 
     final repository = container.read(storeRepositoryProvider);
     final store = (await repository.getStores('household-a')).single;
@@ -30,12 +28,8 @@ void main() {
     final container = createContainer();
     addTearDown(container.dispose);
 
-    await container
-        .read(storeControllerProvider('household-a'))
-        .add('スーパーA');
-    await container
-        .read(storeControllerProvider('household-b'))
-        .add('スーパーB');
+    await container.read(storeControllerProvider('household-a')).add('スーパーA');
+    await container.read(storeControllerProvider('household-b')).add('スーパーB');
 
     final repository = container.read(storeRepositoryProvider);
     expect((await repository.getStores('household-a')).single.name, 'スーパーA');

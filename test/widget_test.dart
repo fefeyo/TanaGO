@@ -1,30 +1,35 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:tanago/main.dart';
+import 'package:tanago/src/app.dart';
+import 'package:tanago/src/features/auth/data/in_memory_auth_repository.dart';
+import 'package:tanago/src/features/auth/presentation/auth_controller.dart';
+import 'package:tanago/src/features/household/data/in_memory_household_repository.dart';
+import 'package:tanago/src/features/household/presentation/household_controller.dart';
+import 'package:tanago/src/features/shopping_list/data/in_memory_shopping_list_repository.dart';
+import 'package:tanago/src/features/shopping_list/presentation/shopping_list_controller.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
-
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+  testWidgets('starts without Firebase and creates a household',
+      (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(InMemoryAuthRepository()),
+          householdRepositoryProvider
+              .overrideWithValue(InMemoryHouseholdRepository()),
+          shoppingListRepositoryProvider
+              .overrideWithValue(InMemoryShoppingListRepository()),
+        ],
+        child: const TanaGoApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('この名前で始める'), findsOneWidget);
+    await tester.tap(find.text('この名前で始める'));
+    await tester.pumpAndSettle();
+    expect(find.text('この名前で始める'), findsNothing);
+    expect(find.byType(Scaffold), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

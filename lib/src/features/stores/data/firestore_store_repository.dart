@@ -17,10 +17,7 @@ class FirestoreStoreRepository implements StoreRepository {
 
   @override
   Stream<List<Store>> watchStores(String householdId) {
-    return _stores(householdId)
-        .orderBy('name')
-        .snapshots()
-        .map(
+    return _stores(householdId).orderBy('name').snapshots().map(
           (snapshot) => snapshot.docs
               .map((document) => _fromDocument(householdId, document))
               .toList(),
@@ -43,14 +40,22 @@ class FirestoreStoreRepository implements StoreRepository {
   @override
   Future<void> removeStore(String householdId, String storeId) async {
     final store = _stores(householdId).doc(storeId);
-    final mapObjects = await store.collection('mapObjects').get();
-
-    final batch = _firestore.batch();
-    for (final document in mapObjects.docs) {
-      batch.delete(document.reference);
+    // Rules reject new/updated map objects once deletion starts. Retrying a
+    // partially completed deletion is safe, including maps larger than a batch.
+    await _firestore.runTransaction((transaction) async {
+      final snapshot = await transaction.get(store);
+      if (snapshot.exists) transaction.update(store, {'deleting': true});
+    });
+    while (true) {
+      final objects = await store.collection('mapObjects').limit(400).get();
+      if (objects.docs.isEmpty) break;
+      final batch = _firestore.batch();
+      for (final document in objects.docs) {
+        batch.delete(document.reference);
+      }
+      await batch.commit();
     }
-    batch.delete(store);
-    await batch.commit();
+    await store.delete();
   }
 
   Store _fromDocument(

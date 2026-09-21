@@ -1,0 +1,13 @@
+{
+  "name": "tanago-firestore-rules-tests",
+  "private": true,
+  "scripts": {
+    "test:rules": "firebase emulators:exec --only firestore --project demo-tanago 'node --test --test-concurrency=1 test/firestore/*.test.cjs'"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
+    "firebase": "^11.10.0",
+    "firebase-admin": "^14.4.0",
+    "firebase-tools": "^15.30.2"
+  }
+}

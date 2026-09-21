@@ -28,9 +28,7 @@ void main() {
 
     final repository = container.read(householdRepositoryProvider);
     final user = container.read(authRepositoryProvider).currentUser!;
-    final current = await repository
-        .watchCurrentHousehold(user.uid)
-        .first;
+    final current = await repository.watchCurrentHousehold(user.uid).first;
     expect(current?.id, household.id);
 
     final members = await repository.watchMembers(household.id).first;
@@ -63,5 +61,47 @@ void main() {
     final code = await controller.getInviteCode(household.id);
 
     expect(code, startsWith('TANA-'));
+  });
+  test('rejoining preserves ownership and switching households is rejected',
+      () async {
+    final repository = InMemoryHouseholdRepository();
+    final household = await repository.createHousehold(
+      name: 'A',
+      ownerUid: 'a',
+      ownerDisplayName: 'A',
+    );
+    final code = await repository.getInviteCode(household.id);
+    expect(RegExp(r'^TANA-[0-9A-F]{32}$').hasMatch(code), true);
+    await repository.joinHousehold(
+      inviteCode: code.toLowerCase(),
+      uid: 'a',
+      displayName: 'A',
+    );
+    expect(
+      (await repository.watchMembers(household.id).first).single.role.name,
+      'owner',
+    );
+    final other = await repository.createHousehold(
+      name: 'B',
+      ownerUid: 'b',
+      ownerDisplayName: 'B',
+    );
+    final otherCode = await repository.getInviteCode(other.id);
+    await expectLater(
+      repository.joinHousehold(
+        inviteCode: otherCode,
+        uid: 'a',
+        displayName: 'A',
+      ),
+      throwsStateError,
+    );
+    await expectLater(
+      repository.createHousehold(
+        name: 'C',
+        ownerUid: 'a',
+        ownerDisplayName: 'A',
+      ),
+      throwsStateError,
+    );
   });
 }

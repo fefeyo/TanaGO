@@ -48,9 +48,8 @@ class _ShoppingMapPageState extends ConsumerState<ShoppingMapPage> {
       shoppingItems: shoppingItems,
     );
 
-    final selectedShelf = objects
-        .where((object) => object.id == _selectedShelfId)
-        .firstOrNull;
+    final selectedShelf =
+        objects.where((object) => object.id == _selectedShelfId).firstOrNull;
 
     final selectedItems = selectedShelf == null
         ? const <ShoppingItem>[]
@@ -127,10 +126,9 @@ class _ShoppingMapPageState extends ConsumerState<ShoppingMapPage> {
                                     height: object.height * cellSize,
                                     child: _ShoppingMapObject(
                                       object: object,
-                                      isRequired:
-                                          highlightedShelfIds.contains(object.id),
-                                      isSelected:
-                                          _selectedShelfId == object.id,
+                                      isRequired: highlightedShelfIds
+                                          .contains(object.id),
+                                      isSelected: _selectedShelfId == object.id,
                                       onTap: object.type == MapObjectType.shelf
                                           ? () => setState(
                                                 () => _selectedShelfId =

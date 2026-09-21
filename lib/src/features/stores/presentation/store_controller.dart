@@ -10,7 +10,7 @@ final storeRepositoryProvider = Provider<StoreRepository>(
   (ref) => FirestoreStoreRepository(FirebaseFirestore.instance),
 );
 
-final storesProvider = StreamProvider.family<List<Store>, String>(
+final storesProvider = StreamProvider.autoDispose.family<List<Store>, String>(
   (ref, householdId) =>
       ref.watch(storeRepositoryProvider).watchStores(householdId),
 );

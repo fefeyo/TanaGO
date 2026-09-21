@@ -35,11 +35,9 @@ class ShoppingItem {
       createdAt: createdAt,
       categoryId: categoryId ?? this.categoryId,
       isPurchased: isPurchased ?? this.isPurchased,
-      purchasedByUid: clearPurchasedByUid
-          ? null
-          : purchasedByUid ?? this.purchasedByUid,
-      purchasedAt:
-          clearPurchasedAt ? null : purchasedAt ?? this.purchasedAt,
+      purchasedByUid:
+          clearPurchasedByUid ? null : purchasedByUid ?? this.purchasedByUid,
+      purchasedAt: clearPurchasedAt ? null : purchasedAt ?? this.purchasedAt,
     );
   }
 }

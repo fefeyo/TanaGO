@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:uuid/uuid.dart';
 
 import '../domain/household.dart';
 import '../domain/household_repository.dart';
@@ -7,20 +10,55 @@ class FirestoreHouseholdRepository implements HouseholdRepository {
   FirestoreHouseholdRepository(this._firestore);
 
   final FirebaseFirestore _firestore;
+  static const _uuid = Uuid();
 
   @override
   Stream<Household?> watchCurrentHousehold(String uid) {
-    return _firestore.collection('users').doc(uid).snapshots().asyncMap(
-      (user) async {
-        final householdId = user.data()?['householdId'] as String?;
-        if (householdId == null) return null;
-
-        final household =
-            await _firestore.collection('households').doc(householdId).get();
-        if (!household.exists) return null;
-        return _householdFromDocument(household);
+    late StreamController<Household?> controller;
+    StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
+        userSubscription;
+    StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
+        householdSubscription;
+    String? currentId;
+    var generation = 0;
+    controller = StreamController<Household?>(
+      onListen: () {
+        userSubscription =
+            _firestore.collection('users').doc(uid).snapshots().listen(
+          (user) async {
+            final id = user.data()?['householdId'] as String?;
+            if (id != null && id == currentId) return;
+            currentId = id;
+            final version = ++generation;
+            await householdSubscription?.cancel();
+            if (controller.isClosed || version != generation) return;
+            if (id == null) {
+              controller.add(null);
+              return;
+            }
+            householdSubscription =
+                _firestore.collection('households').doc(id).snapshots().listen(
+              (document) {
+                if (version != generation) return;
+                controller.add(
+                  document.exists ? _householdFromDocument(document) : null,
+                );
+              },
+              onError: (Object error, StackTrace stack) {
+                if (version == generation) controller.addError(error, stack);
+              },
+            );
+          },
+          onError: controller.addError,
+        );
+      },
+      onCancel: () async {
+        generation++;
+        await userSubscription?.cancel();
+        await householdSubscription?.cancel();
       },
     );
+    return controller.stream;
   }
 
   @override
@@ -42,30 +80,36 @@ class FirestoreHouseholdRepository implements HouseholdRepository {
     required String ownerDisplayName,
   }) async {
     final householdRef = _firestore.collection('households').doc();
-    final inviteCode = _inviteCode(householdRef.id);
-    final batch = _firestore.batch();
-
-    batch.set(householdRef, {
-      'name': name,
-      'createdByUid': ownerUid,
-      'inviteCode': inviteCode,
-      'createdAt': FieldValue.serverTimestamp(),
+    // 122 random bits, independent of the household id. Never enumerate households.
+    final inviteCode = 'TANA-${_uuid.v4().replaceAll('-', '').toUpperCase()}';
+    final inviteRef = _firestore.collection('householdInvites').doc(inviteCode);
+    final userRef = _firestore.collection('users').doc(ownerUid);
+    await _firestore.runTransaction((transaction) async {
+      final user = await transaction.get(userRef);
+      if (user.data()?['householdId'] != null) {
+        throw StateError('すでに世帯に参加しています');
+      }
+      final invite = await transaction.get(inviteRef);
+      if (invite.exists) throw StateError('招待コードを生成し直してください');
+      transaction.set(householdRef, {
+        'name': name,
+        'createdByUid': ownerUid,
+        'inviteCode': inviteCode,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      transaction.set(inviteRef, {'householdId': householdRef.id});
+      transaction.set(householdRef.collection('members').doc(ownerUid), {
+        'displayName': ownerDisplayName,
+        'role': HouseholdRole.owner.name,
+        'joinedAt': FieldValue.serverTimestamp(),
+      });
+      transaction.set(
+        userRef,
+        {'householdId': householdRef.id},
+        SetOptions(merge: true),
+      );
     });
-    batch.set(householdRef.collection('members').doc(ownerUid), {
-      'displayName': ownerDisplayName,
-      'role': HouseholdRole.owner.name,
-      'joinedAt': FieldValue.serverTimestamp(),
-    });
-    batch.set(_firestore.collection('users').doc(ownerUid), {
-      'householdId': householdRef.id,
-    }, SetOptions(merge: true));
-
-    await batch.commit();
-    return Household(
-      id: householdRef.id,
-      name: name,
-      createdByUid: ownerUid,
-    );
+    return Household(id: householdRef.id, name: name, createdByUid: ownerUid);
   }
 
   @override
@@ -75,29 +119,39 @@ class FirestoreHouseholdRepository implements HouseholdRepository {
     required String displayName,
   }) async {
     final normalized = inviteCode.trim().toUpperCase();
-    final matches = await _firestore
-        .collection('households')
-        .where('inviteCode', isEqualTo: normalized)
-        .limit(1)
-        .get();
-
-    if (matches.docs.isEmpty) {
-      throw StateError('招待コードが見つかりません');
+    if (!RegExp(r'^TANA-[0-9A-F]{32}$').hasMatch(normalized)) {
+      throw StateError('招待コードを確認してください');
     }
-
-    final householdRef = matches.docs.single.reference;
-    final batch = _firestore.batch();
-    batch.set(householdRef.collection('members').doc(uid), {
-      'displayName': displayName,
-      'role': HouseholdRole.member.name,
-      'joinedAt': FieldValue.serverTimestamp(),
+    final userRef = _firestore.collection('users').doc(uid);
+    final householdId = await _firestore.runTransaction((transaction) async {
+      final invite = await transaction
+          .get(_firestore.collection('householdInvites').doc(normalized));
+      final id = invite.data()?['householdId'] as String?;
+      if (id == null) throw StateError('招待コードが見つかりません');
+      final user = await transaction.get(userRef);
+      final currentId = user.data()?['householdId'];
+      if (currentId == id) {
+        return id; // Preserve owner role and joinedAt on retries.
+      }
+      if (currentId != null) throw StateError('すでに別の世帯に参加しています');
+      final memberRef = _firestore
+          .collection('households')
+          .doc(id)
+          .collection('members')
+          .doc(uid);
+      transaction.set(memberRef, {
+        'displayName': displayName,
+        'role': HouseholdRole.member.name,
+        'joinedAt': FieldValue.serverTimestamp(),
+        'inviteCode': normalized,
+      });
+      transaction.set(userRef, {'householdId': id}, SetOptions(merge: true));
+      return id;
     });
-    batch.set(_firestore.collection('users').doc(uid), {
-      'householdId': householdRef.id,
-    }, SetOptions(merge: true));
-    await batch.commit();
-
-    return _householdFromDocument(matches.docs.single);
+    // Only members can read the household; do this after the atomic join.
+    final household =
+        await _firestore.collection('households').doc(householdId).get();
+    return _householdFromDocument(household);
   }
 
   @override
@@ -105,9 +159,7 @@ class FirestoreHouseholdRepository implements HouseholdRepository {
     final household =
         await _firestore.collection('households').doc(householdId).get();
     final code = household.data()?['inviteCode'] as String?;
-    if (code == null) {
-      throw StateError('招待コードがありません');
-    }
+    if (code == null) throw StateError('招待コードがありません');
     return code;
   }
 
@@ -117,8 +169,8 @@ class FirestoreHouseholdRepository implements HouseholdRepository {
     final data = document.data()!;
     return Household(
       id: document.id,
-      name: data['name'] as String? ?? '',
-      createdByUid: data['createdByUid'] as String? ?? '',
+      name: data['name'] as String,
+      createdByUid: data['createdByUid'] as String,
     );
   }
 
@@ -133,10 +185,5 @@ class FirestoreHouseholdRepository implements HouseholdRepository {
           ? HouseholdRole.owner
           : HouseholdRole.member,
     );
-  }
-
-  String _inviteCode(String householdId) {
-    final compact = householdId.replaceAll('-', '').toUpperCase();
-    return 'TANA-${compact.substring(0, 4)}';
   }
 }

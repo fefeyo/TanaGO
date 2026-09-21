@@ -73,4 +73,24 @@ void main() {
     expect((await repository.getItems('household-a')).single.name, '牛乳');
     expect((await repository.getItems('household-b')).single.name, 'しょうゆ');
   });
+  test('concurrent purchase and category edits retain both changes', () async {
+    final container = createContainer();
+    addTearDown(container.dispose);
+    final controller =
+        container.read(shoppingListControllerProvider('household-a'));
+    final repository = container.read(shoppingListRepositoryProvider);
+    await controller.add('牛乳');
+    final id = (await repository.getItems('household-a')).single.id;
+    await Future.wait([
+      controller.togglePurchased(id),
+      controller.updateCategory(id, 'beverages'),
+    ]);
+    final item = (await repository.getItems('household-a')).single;
+    expect(item.isPurchased, true);
+    expect(item.categoryId, 'beverages');
+    await controller.remove(id);
+    await controller.togglePurchased(id);
+    await controller.updateCategory(id, 'dairy');
+    expect(await repository.getItems('household-a'), isEmpty);
+  });
 }

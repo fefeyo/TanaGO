@@ -5,8 +5,7 @@ import '../domain/shopping_list_repository.dart';
 
 class InMemoryShoppingListRepository implements ShoppingListRepository {
   final _items = <String, List<ShoppingItem>>{};
-  final _controllers =
-      <String, StreamController<List<ShoppingItem>>>{};
+  final _controllers = <String, StreamController<List<ShoppingItem>>>{};
 
   @override
   Stream<List<ShoppingItem>> watchItems(String householdId) async* {
@@ -27,10 +26,14 @@ class InMemoryShoppingListRepository implements ShoppingListRepository {
   }
 
   @override
-  Future<void> updateItem(String householdId, ShoppingItem item) async {
+  Future<void> updateItem(
+    String householdId,
+    String itemId,
+    ShoppingItem Function(ShoppingItem current) update,
+  ) async {
     final items = [
       for (final current in _items[householdId] ?? const <ShoppingItem>[])
-        if (current.id == item.id) item else current,
+        if (current.id == itemId) update(current) else current,
     ];
     _items[householdId] = items;
     _emit(householdId);

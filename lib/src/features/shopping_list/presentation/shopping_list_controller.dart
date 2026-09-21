@@ -14,10 +14,9 @@ final shoppingListRepositoryProvider = Provider<ShoppingListRepository>(
 );
 
 final shoppingListProvider =
-    StreamProvider.family<List<ShoppingItem>, String>(
-  (ref, householdId) => ref
-      .watch(shoppingListRepositoryProvider)
-      .watchItems(householdId),
+    StreamProvider.autoDispose.family<List<ShoppingItem>, String>(
+  (ref, householdId) =>
+      ref.watch(shoppingListRepositoryProvider).watchItems(householdId),
 );
 
 final shoppingListControllerProvider =
@@ -65,28 +64,21 @@ class ShoppingListController {
     );
   }
 
-  Future<void> updateCategory(String id, String categoryId) async {
-    final item = await _findItem(id);
-    if (item == null) {
-      return;
-    }
-    await _repository.updateItem(
+  Future<void> updateCategory(String id, String categoryId) {
+    return _repository.updateItem(
       _householdId,
-      item.copyWith(categoryId: categoryId),
+      id,
+      (item) => item.copyWith(categoryId: categoryId),
     );
   }
 
   Future<void> togglePurchased(String id) async {
-    final item = await _findItem(id);
-    if (item == null) {
-      return;
-    }
-
     final user = _authRepository.currentUser ?? await _authRepository.signIn();
-
+    final purchasedAt = DateTime.now();
     await _repository.updateItem(
       _householdId,
-      item.isPurchased
+      id,
+      (item) => item.isPurchased
           ? item.copyWith(
               isPurchased: false,
               clearPurchasedByUid: true,
@@ -95,22 +87,10 @@ class ShoppingListController {
           : item.copyWith(
               isPurchased: true,
               purchasedByUid: user.uid,
-              purchasedAt: DateTime.now(),
+              purchasedAt: purchasedAt,
             ),
     );
   }
 
-  Future<void> remove(String id) {
-    return _repository.removeItem(_householdId, id);
-  }
-
-  Future<ShoppingItem?> _findItem(String id) async {
-    final items = await _repository.getItems(_householdId);
-    for (final item in items) {
-      if (item.id == id) {
-        return item;
-      }
-    }
-    return null;
-  }
+  Future<void> remove(String id) => _repository.removeItem(_householdId, id);
 }

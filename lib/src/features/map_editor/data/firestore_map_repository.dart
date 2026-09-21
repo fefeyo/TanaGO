@@ -37,28 +37,41 @@ class FirestoreMapRepository implements MapRepository {
   }
 
   @override
+  Future<void> updateObject(
+    StoreMapKey key,
+    String objectId,
+    MapObject Function(MapObject current) update,
+  ) {
+    final reference = _objects(key).doc(objectId);
+    return _firestore.runTransaction((transaction) async {
+      final snapshot = await transaction.get(reference);
+      if (!snapshot.exists) return;
+      transaction.update(reference, _toMap(update(_fromDocument(snapshot))));
+    });
+  }
+
+  @override
   Future<void> removeObject(StoreMapKey key, String objectId) {
     return _objects(key).doc(objectId).delete();
   }
 
   @override
   Future<void> clear(StoreMapKey key) async {
-    final snapshot = await _objects(key).get();
-    if (snapshot.docs.isEmpty) {
-      return;
+    while (true) {
+      final snapshot = await _objects(key).limit(400).get();
+      if (snapshot.docs.isEmpty) return;
+      final batch = _firestore.batch();
+      for (final document in snapshot.docs) {
+        batch.delete(document.reference);
+      }
+      await batch.commit();
     }
-
-    final batch = _firestore.batch();
-    for (final document in snapshot.docs) {
-      batch.delete(document.reference);
-    }
-    await batch.commit();
   }
 
   MapObject _fromDocument(
-    QueryDocumentSnapshot<Map<String, dynamic>> document,
+    DocumentSnapshot<Map<String, dynamic>> document,
   ) {
-    final data = document.data();
+    final data = document.data()!;
     final typeName = data['type'] as String?;
     final type = MapObjectType.values.firstWhere(
       (value) => value.name == typeName,

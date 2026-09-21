@@ -112,4 +112,31 @@ void main() {
       hasLength(1),
     );
   });
+  test(
+      'concurrent move and details preserve both; deleted objects stay deleted',
+      () async {
+    final container = ProviderContainer(
+      overrides: [
+        mapRepositoryProvider.overrideWithValue(InMemoryMapRepository()),
+      ],
+    );
+    addTearDown(container.dispose);
+    final controller = container.read(mapEditorControllerProvider(storeA));
+    final repository = container.read(mapRepositoryProvider);
+    await controller.add(type: MapObjectType.shelf, x: 0, y: 0);
+    final id = (await repository.getObjects(storeA)).single.id;
+    await Future.wait([
+      controller.move(id: id, x: 9, y: 15),
+      controller.updateDetails(id: id, label: '牛乳', categoryIds: ['dairy']),
+    ]);
+    await controller.resize(id: id, width: 12, height: 16);
+    final object = (await repository.getObjects(storeA)).single;
+    expect(object.x, 9);
+    expect(object.label, '牛乳');
+    expect(object.width, 3);
+    expect(object.height, 1);
+    await controller.remove(id);
+    await controller.move(id: id, x: 0, y: 0);
+    expect(await repository.getObjects(storeA), isEmpty);
+  });
 }

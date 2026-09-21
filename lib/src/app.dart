@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'features/auth/presentation/auth_controller.dart';
 import 'features/household/presentation/household_controller.dart';
 import 'features/household/presentation/household_page.dart';
 import 'features/household/presentation/household_setup_page.dart';
@@ -58,11 +59,28 @@ class TanaGoApp extends ConsumerWidget {
       routerConfig: _router,
       builder: (context, child) {
         return household.when(
+          skipLoadingOnRefresh: false,
+          skipLoadingOnReload: false,
           loading: () => const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           ),
           error: (error, stackTrace) => Scaffold(
-            body: Center(child: Text('世帯情報を読み込めませんでした: $error')),
+            body: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('世帯情報を読み込めませんでした: $error'),
+                  FilledButton(
+                    onPressed: () {
+                      ref.invalidate(authBootstrapProvider);
+                      ref.invalidate(authUserProvider);
+                      ref.invalidate(householdProvider);
+                    },
+                    child: const Text('再試行'),
+                  ),
+                ],
+              ),
+            ),
           ),
           data: (value) {
             if (value == null) {

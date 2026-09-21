@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../auth/domain/auth_repository.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../data/firestore_household_repository.dart';
 import '../domain/household.dart';
@@ -10,19 +11,25 @@ final householdRepositoryProvider = Provider<HouseholdRepository>(
   (ref) => FirestoreHouseholdRepository(FirebaseFirestore.instance),
 );
 
-final householdProvider = StreamProvider<Household?>((ref) async* {
-  final user = await ref.watch(authControllerProvider).ensureSignedIn();
-
-  yield* ref
-      .watch(householdRepositoryProvider)
-      .watchCurrentHousehold(user.uid);
+final householdProvider = StreamProvider<Household?>((ref) {
+  final auth = ref.watch(authUserProvider);
+  final repository = ref.watch(householdRepositoryProvider);
+  // All watches happen synchronously; Riverpod cancels the previous uid's stream.
+  return auth.when(
+    skipLoadingOnRefresh: false,
+    skipLoadingOnReload: false,
+    data: (user) => user == null
+        ? Stream.value(null)
+        : repository.watchCurrentHousehold(user.uid),
+    error: (error, stack) => Stream.error(error, stack),
+    loading: () => const Stream.empty(),
+  );
 });
 
 final householdMembersProvider =
-    StreamProvider.family<List<HouseholdMember>, String>(
-  (ref, householdId) => ref
-      .watch(householdRepositoryProvider)
-      .watchMembers(householdId),
+    StreamProvider.autoDispose.family<List<HouseholdMember>, String>(
+  (ref, householdId) =>
+      ref.watch(householdRepositoryProvider).watchMembers(householdId),
 );
 
 final householdControllerProvider = Provider<HouseholdController>(

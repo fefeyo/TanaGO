@@ -37,8 +37,18 @@ class FirestoreShoppingListRepository implements ShoppingListRepository {
   }
 
   @override
-  Future<void> updateItem(String householdId, ShoppingItem item) {
-    return _items(householdId).doc(item.id).set(_toMap(item));
+  Future<void> updateItem(
+    String householdId,
+    String itemId,
+    ShoppingItem Function(ShoppingItem current) update,
+  ) {
+    final reference = _items(householdId).doc(itemId);
+    return _firestore.runTransaction((transaction) async {
+      final snapshot = await transaction.get(reference);
+      if (!snapshot.exists) return;
+      final current = _fromDocument(snapshot);
+      transaction.update(reference, _toMap(update(current)));
+    });
   }
 
   @override
@@ -47,9 +57,9 @@ class FirestoreShoppingListRepository implements ShoppingListRepository {
   }
 
   ShoppingItem _fromDocument(
-    QueryDocumentSnapshot<Map<String, dynamic>> document,
+    DocumentSnapshot<Map<String, dynamic>> document,
   ) {
-    final data = document.data();
+    final data = document.data()!;
     return ShoppingItem(
       id: document.id,
       name: data['name'] as String? ?? '',

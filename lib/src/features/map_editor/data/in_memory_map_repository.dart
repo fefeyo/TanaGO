@@ -6,8 +6,7 @@ import '../domain/store_map_key.dart';
 
 class InMemoryMapRepository implements MapRepository {
   final _objects = <StoreMapKey, List<MapObject>>{};
-  final _controllers =
-      <StoreMapKey, StreamController<List<MapObject>>>{};
+  final _controllers = <StoreMapKey, StreamController<List<MapObject>>>{};
 
   @override
   Stream<List<MapObject>> watchObjects(StoreMapKey key) async* {
@@ -30,6 +29,19 @@ class InMemoryMapRepository implements MapRepository {
               if (item.id == object.id) object else item,
           ]
         : [...current, object];
+    _emit(key);
+  }
+
+  @override
+  Future<void> updateObject(
+    StoreMapKey key,
+    String objectId,
+    MapObject Function(MapObject current) update,
+  ) async {
+    _objects[key] = [
+      for (final object in _objects[key] ?? const <MapObject>[])
+        if (object.id == objectId) update(object) else object,
+    ];
     _emit(key);
   }
 
