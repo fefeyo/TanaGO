@@ -1,11 +1,12 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../data/in_memory_auth_repository.dart';
+import '../data/firebase_auth_repository.dart';
 import '../domain/app_user.dart';
 import '../domain/auth_repository.dart';
 
 final authRepositoryProvider = Provider<AuthRepository>(
-  (ref) => InMemoryAuthRepository(),
+  (ref) => FirebaseAuthRepository(FirebaseAuth.instance),
 );
 
 final authUserProvider = StreamProvider<AppUser?>(
