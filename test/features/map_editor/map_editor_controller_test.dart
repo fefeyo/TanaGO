@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tanago/src/features/map_editor/data/in_memory_map_repository.dart';
 import 'package:tanago/src/features/map_editor/domain/map_object.dart';
 import 'package:tanago/src/features/map_editor/domain/store_map_key.dart';
 import 'package:tanago/src/features/map_editor/presentation/map_editor_controller.dart';
@@ -11,7 +12,11 @@ void main() {
   );
 
   test('adds and edits a shelf', () async {
-    final container = ProviderContainer();
+    final container = ProviderContainer(
+      overrides: [
+        mapRepositoryProvider.overrideWithValue(InMemoryMapRepository()),
+      ],
+    );
     addTearDown(container.dispose);
 
     final controller = container.read(mapEditorControllerProvider(storeA));
@@ -40,7 +45,11 @@ void main() {
   });
 
   test('clears a shelf label', () async {
-    final container = ProviderContainer();
+    final container = ProviderContainer(
+      overrides: [
+        mapRepositoryProvider.overrideWithValue(InMemoryMapRepository()),
+      ],
+    );
     addTearDown(container.dispose);
 
     final controller = container.read(mapEditorControllerProvider(storeA));
@@ -55,7 +64,11 @@ void main() {
   });
 
   test('keeps maps isolated by household and store', () async {
-    final container = ProviderContainer();
+    final container = ProviderContainer(
+      overrides: [
+        mapRepositoryProvider.overrideWithValue(InMemoryMapRepository()),
+      ],
+    );
     addTearDown(container.dispose);
 
     const sameStoreOtherHousehold = StoreMapKey(
