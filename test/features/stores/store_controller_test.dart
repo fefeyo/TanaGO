@@ -1,10 +1,19 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tanago/src/features/stores/data/in_memory_store_repository.dart';
 import 'package:tanago/src/features/stores/presentation/store_controller.dart';
+
+ProviderContainer createContainer() {
+  return ProviderContainer(
+    overrides: [
+      storeRepositoryProvider.overrideWithValue(InMemoryStoreRepository()),
+    ],
+  );
+}
 
 void main() {
   test('creates stores in the selected household', () async {
-    final container = ProviderContainer();
+    final container = createContainer();
     addTearDown(container.dispose);
 
     await container
@@ -18,7 +27,7 @@ void main() {
   });
 
   test('keeps stores isolated per household', () async {
-    final container = ProviderContainer();
+    final container = createContainer();
     addTearDown(container.dispose);
 
     await container
