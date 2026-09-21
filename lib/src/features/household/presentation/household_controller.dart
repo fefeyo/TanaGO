@@ -1,20 +1,17 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/presentation/auth_controller.dart';
-import '../data/in_memory_household_repository.dart';
+import '../data/firestore_household_repository.dart';
 import '../domain/household.dart';
 import '../domain/household_repository.dart';
 
 final householdRepositoryProvider = Provider<HouseholdRepository>(
-  (ref) => InMemoryHouseholdRepository(),
+  (ref) => FirestoreHouseholdRepository(FirebaseFirestore.instance),
 );
 
 final householdProvider = StreamProvider<Household?>((ref) async* {
-  final user = await ref.watch(authUserProvider.future);
-  if (user == null) {
-    yield null;
-    return;
-  }
+  final user = await ref.watch(authControllerProvider).ensureSignedIn();
 
   yield* ref
       .watch(householdRepositoryProvider)
