@@ -1,10 +1,24 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tanago/src/features/auth/data/in_memory_auth_repository.dart';
+import 'package:tanago/src/features/auth/presentation/auth_controller.dart';
+import 'package:tanago/src/features/shopping_list/data/in_memory_shopping_list_repository.dart';
 import 'package:tanago/src/features/shopping_list/presentation/shopping_list_controller.dart';
+
+ProviderContainer createContainer() {
+  return ProviderContainer(
+    overrides: [
+      authRepositoryProvider.overrideWithValue(InMemoryAuthRepository()),
+      shoppingListRepositoryProvider.overrideWithValue(
+        InMemoryShoppingListRepository(),
+      ),
+    ],
+  );
+}
 
 void main() {
   test('adds, categorizes, toggles, and removes shopping items', () async {
-    final container = ProviderContainer();
+    final container = createContainer();
     addTearDown(container.dispose);
 
     final controller =
@@ -29,7 +43,7 @@ void main() {
   });
 
   test('keeps unknown category empty and explicit category wins', () async {
-    final container = ProviderContainer();
+    final container = createContainer();
     addTearDown(container.dispose);
 
     final controller =
@@ -45,7 +59,7 @@ void main() {
   });
 
   test('keeps shopping items isolated per household', () async {
-    final container = ProviderContainer();
+    final container = createContainer();
     addTearDown(container.dispose);
 
     await container
