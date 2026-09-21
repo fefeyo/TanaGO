@@ -1,15 +1,16 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../auth/domain/auth_repository.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../product_categories/domain/product_category_classifier.dart';
-import '../data/in_memory_shopping_list_repository.dart';
+import '../data/firestore_shopping_list_repository.dart';
 import '../domain/shopping_item.dart';
 import '../domain/shopping_list_repository.dart';
 
 final shoppingListRepositoryProvider = Provider<ShoppingListRepository>(
-  (ref) => InMemoryShoppingListRepository(),
+  (ref) => FirestoreShoppingListRepository(FirebaseFirestore.instance),
 );
 
 final shoppingListProvider =
