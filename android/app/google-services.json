@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "715957827608",
+    "project_id": "tanago-77c59",
+    "storage_bucket": "tanago-77c59.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:715957827608:android:8f386a393733f78ebaab6d",
+        "android_client_info": {
+          "package_name": "com.fefeyo.tanago"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDq8T2TEuj75vfvOP95M2upi6eUR3cKmvA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
