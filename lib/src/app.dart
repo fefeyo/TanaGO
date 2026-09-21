@@ -11,42 +11,51 @@ import 'features/shopping_list/presentation/shopping_list_page.dart';
 import 'features/shopping_map/presentation/shopping_map_page.dart';
 import 'features/stores/presentation/store_list_page.dart';
 
-class TanaGoApp extends ConsumerWidget {
-  const TanaGoApp({super.key});
-
-  static final _router = GoRouter(
+final _routerProvider = Provider.autoDispose<GoRouter>((ref) {
+  final router = GoRouter(
     routes: [
-      GoRoute(
-        path: '/',
-        builder: (context, state) => const ShoppingListPage(),
-      ),
-      GoRoute(
-        path: '/household',
-        builder: (context, state) => const HouseholdPage(),
-      ),
-      GoRoute(
-        path: '/stores',
-        builder: (context, state) => const StoreListPage(),
-      ),
-      GoRoute(
-        path: '/stores/:storeId/map',
-        builder: (context, state) => ShoppingMapPage(
-          storeId: state.pathParameters['storeId']!,
-        ),
-      ),
-      GoRoute(
-        path: '/stores/:storeId/map/edit',
-        builder: (context, state) => MapEditorPage(
-          storeId: state.pathParameters['storeId']!,
-        ),
+      ShellRoute(
+        // Keep setup/loading/error pages inside the root Navigator so text
+        // selection, menus and dialogs always have an Overlay ancestor.
+        builder: (context, state, child) => _HouseholdGate(child: child),
+        routes: [
+          GoRoute(
+            path: '/',
+            builder: (context, state) => const ShoppingListPage(),
+          ),
+          GoRoute(
+            path: '/household',
+            builder: (context, state) => const HouseholdPage(),
+          ),
+          GoRoute(
+            path: '/stores',
+            builder: (context, state) => const StoreListPage(),
+          ),
+          GoRoute(
+            path: '/stores/:storeId/map',
+            builder: (context, state) => ShoppingMapPage(
+              storeId: state.pathParameters['storeId']!,
+            ),
+          ),
+          GoRoute(
+            path: '/stores/:storeId/map/edit',
+            builder: (context, state) => MapEditorPage(
+              storeId: state.pathParameters['storeId']!,
+            ),
+          ),
+        ],
       ),
     ],
   );
+  ref.onDispose(router.dispose);
+  return router;
+});
+
+class TanaGoApp extends ConsumerWidget {
+  const TanaGoApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final household = ref.watch(householdProvider);
-
     return MaterialApp.router(
       title: 'TanaGO',
       debugShowCheckedModeBanner: false,
@@ -56,9 +65,19 @@ class TanaGoApp extends ConsumerWidget {
         ),
         useMaterial3: true,
       ),
-      routerConfig: _router,
-      builder: (context, child) {
-        return household.when(
+      routerConfig: ref.watch(_routerProvider),
+    );
+  }
+}
+
+class _HouseholdGate extends ConsumerWidget {
+  const _HouseholdGate({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return ref.watch(householdProvider).when(
           skipLoadingOnRefresh: false,
           skipLoadingOnReload: false,
           loading: () => const Scaffold(
@@ -82,14 +101,7 @@ class TanaGoApp extends ConsumerWidget {
               ),
             ),
           ),
-          data: (value) {
-            if (value == null) {
-              return const HouseholdSetupPage();
-            }
-            return child ?? const SizedBox.shrink();
-          },
+          data: (value) => value == null ? const HouseholdSetupPage() : child,
         );
-      },
-    );
   }
 }
