@@ -1,13 +1,14 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
-import '../data/in_memory_map_repository.dart';
+import '../data/firestore_map_repository.dart';
 import '../domain/map_object.dart';
 import '../domain/map_repository.dart';
 import '../domain/store_map_key.dart';
 
 final mapRepositoryProvider = Provider<MapRepository>(
-  (ref) => InMemoryMapRepository(),
+  (ref) => FirestoreMapRepository(FirebaseFirestore.instance),
 );
 
 final mapEditorProvider =
