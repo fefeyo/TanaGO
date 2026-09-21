@@ -1,11 +1,24 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tanago/src/features/auth/data/in_memory_auth_repository.dart';
 import 'package:tanago/src/features/auth/presentation/auth_controller.dart';
+import 'package:tanago/src/features/household/data/in_memory_household_repository.dart';
 import 'package:tanago/src/features/household/presentation/household_controller.dart';
+
+ProviderContainer createContainer() {
+  return ProviderContainer(
+    overrides: [
+      authRepositoryProvider.overrideWithValue(InMemoryAuthRepository()),
+      householdRepositoryProvider.overrideWithValue(
+        InMemoryHouseholdRepository(),
+      ),
+    ],
+  );
+}
 
 void main() {
   test('starts without a household and creates one', () async {
-    final container = ProviderContainer();
+    final container = createContainer();
     addTearDown(container.dispose);
 
     final controller = container.read(householdControllerProvider);
@@ -26,7 +39,7 @@ void main() {
   });
 
   test('rejects blank household name and invite code', () async {
-    final container = ProviderContainer();
+    final container = createContainer();
     addTearDown(container.dispose);
 
     final controller = container.read(householdControllerProvider);
@@ -42,7 +55,7 @@ void main() {
   });
 
   test('creates an invite code for the household', () async {
-    final container = ProviderContainer();
+    final container = createContainer();
     addTearDown(container.dispose);
 
     final controller = container.read(householdControllerProvider);
