@@ -38,6 +38,29 @@ class FirestoreStoreRepository implements StoreRepository {
   }
 
   @override
+  Future<void> expandMap(
+    String householdId,
+    String storeId, {
+    required int width,
+    required int height,
+  }) async {
+    if (width < 1 || width > 100 || height < 1 || height > 100) {
+      throw ArgumentError('Map dimensions must be between 1 and 100');
+    }
+    final reference = _stores(householdId).doc(storeId);
+    await _firestore.runTransaction((transaction) async {
+      final data = (await transaction.get(reference)).data();
+      if (data == null || data['deleting'] == true) {
+        throw StateError('Store is unavailable');
+      }
+      transaction.update(reference, {
+        'mapWidth': width.clamp((data['mapWidth'] as num).toInt(), 100),
+        'mapHeight': height.clamp((data['mapHeight'] as num).toInt(), 100),
+      });
+    });
+  }
+
+  @override
   Future<void> removeStore(String householdId, String storeId) async {
     final store = _stores(householdId).doc(storeId);
     // Rules reject new/updated map objects once deletion starts. Retrying a

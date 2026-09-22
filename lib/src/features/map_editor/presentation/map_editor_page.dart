@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../household/presentation/household_controller.dart';
+import '../../stores/domain/store.dart';
+import '../../stores/presentation/store_controller.dart';
+import 'draggable_map_object.dart';
+import 'map_viewport.dart';
+
 import '../../product_categories/domain/product_categories.dart';
 import '../domain/map_object.dart';
 import '../domain/store_map_key.dart';
@@ -16,13 +21,10 @@ class MapEditorPage extends ConsumerStatefulWidget {
 }
 
 class _MapEditorPageState extends ConsumerState<MapEditorPage> {
-  static const _columns = 12;
-  static const _rows = 16;
+  bool _navigate = false;
 
   MapObjectType _selectedType = MapObjectType.shelf;
   String? _selectedObjectId;
-  final Map<String, Offset> _dragOrigins = {};
-  final Map<String, Offset> _dragDeltas = {};
 
   StoreMapKey get _mapKey => StoreMapKey(
         householdId: ref.read(householdProvider).valueOrNull!.id,
@@ -31,12 +33,44 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
 
   @override
   Widget build(BuildContext context) {
-    final household = ref.watch(householdProvider).valueOrNull!;
+    final household = ref.watch(householdProvider).valueOrNull;
+    if (household == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     final mapKey = StoreMapKey(
       householdId: household.id,
       storeId: widget.storeId,
     );
+    final storesAsync = ref.watch(storesProvider(household.id));
     final objectsAsync = ref.watch(mapEditorProvider(mapKey));
+    final store = storesAsync.valueOrNull
+        ?.where((store) => store.id == widget.storeId)
+        .firstOrNull;
+    if (store == null || !objectsAsync.hasValue) {
+      final failed = storesAsync.hasError || objectsAsync.hasError;
+      final missing = storesAsync.hasValue && store == null;
+      return Scaffold(
+        appBar: AppBar(title: const Text('店内マップを作る')),
+        body: Center(
+          child: failed || missing
+              ? Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(missing ? '店舗が見つかりません' : 'マップを読み込めませんでした'),
+                    TextButton(
+                      onPressed: () {
+                        ref.invalidate(storesProvider(household.id));
+                        ref.invalidate(mapEditorProvider(mapKey));
+                      },
+                      child: const Text('再読み込み'),
+                    ),
+                  ],
+                )
+              : const CircularProgressIndicator(),
+        ),
+      );
+    }
+    final controller = ref.read(mapEditorControllerProvider(mapKey));
     final objects = objectsAsync.valueOrNull ?? const <MapObject>[];
 
     return Scaffold(
@@ -44,11 +78,16 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
         title: const Text('店内マップを作る'),
         actions: [
           IconButton(
+            tooltip: 'マス目を増やす',
+            onPressed: () => _expandMap(store),
+            icon: const Icon(Icons.aspect_ratio),
+          ),
+          IconButton(
             tooltip: 'すべて削除',
             onPressed: objects.isEmpty
                 ? null
                 : () {
-                    ref.read(mapEditorControllerProvider(_mapKey)).clear();
+                    _save(controller.clear());
                     setState(() => _selectedObjectId = null);
                   },
             icon: const Icon(Icons.delete_sweep_outlined),
@@ -62,116 +101,209 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
             onSelected: (type) => setState(() => _selectedType = type),
           ),
           const Divider(height: 1),
-          Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final mapWidth = constraints.maxWidth - 24;
-                final cellSize = mapWidth / _columns;
-                final mapHeight = cellSize * _rows;
-
-                return SingleChildScrollView(
-                  padding: const EdgeInsets.all(12),
-                  child: SizedBox(
-                    width: mapWidth,
-                    height: mapHeight,
-                    child: Stack(
-                      children: [
-                        Positioned.fill(
-                          child: GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onTapUp: (details) {
-                              final width =
-                                  _selectedType == MapObjectType.shelf ? 3 : 1;
-                              final rawX =
-                                  (details.localPosition.dx / cellSize).floor();
-                              final y =
-                                  (details.localPosition.dy / cellSize).floor();
-                              final x = rawX.clamp(0, _columns - width);
-
-                              ref
-                                  .read(mapEditorControllerProvider(_mapKey))
-                                  .add(
-                                    type: _selectedType,
-                                    x: x,
-                                    y: y.clamp(0, _rows - 1),
-                                  );
-                            },
-                            child: CustomPaint(
-                              painter: const _GridPainter(
-                                columns: _columns,
-                                rows: _rows,
-                              ),
-                            ),
-                          ),
-                        ),
-                        for (final object in objects)
-                          Positioned(
-                            left: object.x * cellSize,
-                            top: object.y * cellSize,
-                            width: object.width * cellSize,
-                            height: object.height * cellSize,
-                            child: GestureDetector(
-                              onTap: () => _selectObject(object),
-                              onLongPress: () => _confirmDelete(object),
-                              onPanStart: (_) {
-                                _dragOrigins[object.id] = Offset(
-                                  object.x.toDouble(),
-                                  object.y.toDouble(),
-                                );
-                                _dragDeltas[object.id] = Offset.zero;
-                                setState(() => _selectedObjectId = object.id);
-                              },
-                              onPanUpdate: (details) {
-                                final origin = _dragOrigins[object.id];
-                                if (origin == null) return;
-
-                                final delta =
-                                    (_dragDeltas[object.id] ?? Offset.zero) +
-                                        details.delta;
-                                _dragDeltas[object.id] = delta;
-
-                                final x = (origin.dx + delta.dx / cellSize)
-                                    .round()
-                                    .clamp(0, _columns - object.width);
-                                final y = (origin.dy + delta.dy / cellSize)
-                                    .round()
-                                    .clamp(0, _rows - object.height);
-
-                                ref
-                                    .read(mapEditorControllerProvider(_mapKey))
-                                    .move(
-                                      id: object.id,
-                                      x: x,
-                                      y: y,
-                                    );
-                              },
-                              onPanEnd: (_) => _finishDrag(object.id),
-                              onPanCancel: () => _finishDrag(object.id),
-                              child: _MapObjectTile(
-                                object: object,
-                                isSelected: object.id == _selectedObjectId,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                );
-              },
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              children: [
+                Text('${store.mapWidth} × ${store.mapHeight} マス'),
+                const Spacer(),
+                FilterChip(
+                  label: const Text('移動・拡大'),
+                  avatar: const Icon(Icons.pan_tool_outlined, size: 18),
+                  selected: _navigate,
+                  onSelected: (value) => setState(() => _navigate = value),
+                ),
+              ],
             ),
           ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 8, 16, 16),
-            child: Text('タップで配置 / ドラッグで移動 / オブジェクトをタップして編集'),
+          Expanded(
+            child: MapViewport(
+              columns: store.mapWidth,
+              rows: store.mapHeight,
+              navigationEnabled: _navigate,
+              builder: (transform) => Stack(
+                children: [
+                  Positioned.fill(
+                    child: RepaintBoundary(
+                      child: GestureDetector(
+                        key: const ValueKey('map-grid'),
+                        behavior: HitTestBehavior.opaque,
+                        onTapUp: _navigate
+                            ? null
+                            : (details) => _save(
+                                  controller.add(
+                                    type: _selectedType,
+                                    x: (details.localPosition.dx /
+                                            MapViewport.cellSize)
+                                        .floor(),
+                                    y: (details.localPosition.dy /
+                                            MapViewport.cellSize)
+                                        .floor(),
+                                    mapWidth: store.mapWidth,
+                                    mapHeight: store.mapHeight,
+                                  ),
+                                ),
+                        child: CustomPaint(
+                          painter: _GridPainter(
+                            columns: store.mapWidth,
+                            rows: store.mapHeight,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  for (final object in objects)
+                    DraggableMapObject(
+                      key: ValueKey(object.id),
+                      object: object,
+                      columns: store.mapWidth,
+                      rows: store.mapHeight,
+                      transform: transform,
+                      enabled: !_navigate,
+                      onMove: (x, y) async {
+                        final saved = await controller.move(
+                          id: object.id,
+                          x: x,
+                          y: y,
+                          mapWidth: store.mapWidth,
+                          mapHeight: store.mapHeight,
+                        );
+                        return saved == null
+                            ? null
+                            : Offset(saved.x.toDouble(), saved.y.toDouble());
+                      },
+                      onError: () =>
+                          _showSaveError('移動を保存できませんでした。通信を確認して、もう一度移動してください。'),
+                      onTap: () => _selectObject(object),
+                      onLongPress: () => _confirmDelete(object),
+                      child: _MapObjectTile(
+                        object: object,
+                        isSelected: object.id == _selectedObjectId,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: Text(
+              _navigate ? 'スワイプで画面移動 / ピンチで拡大・縮小' : '空きマスをタップで配置 / 棚をドラッグで移動',
+            ),
           ),
         ],
       ),
     );
   }
 
-  void _finishDrag(String id) {
-    _dragOrigins.remove(id);
-    _dragDeltas.remove(id);
+  void _showSaveError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _save(Future<void> action) async {
+    try {
+      await action;
+    } catch (_) {
+      _showSaveError('保存できませんでした。通信を確認して、もう一度お試しください。');
+    }
+  }
+
+  Future<void> _expandMap(Store store) async {
+    final width = TextEditingController(text: '${store.mapWidth}');
+    final height = TextEditingController(text: '${store.mapHeight}');
+    final form = GlobalKey<FormState>();
+    final repository = ref.read(storeRepositoryProvider);
+    var saving = false;
+    String? error;
+    final route = DialogRoute<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, update) => AlertDialog(
+          title: const Text('マス目を増やす'),
+          content: SingleChildScrollView(
+            child: Form(
+              key: form,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('店舗の広さに合わせて、最大 100 × 100 マスまで広げられます。'),
+                  const SizedBox(height: 16),
+                  for (final entry in [
+                    (width, store.mapWidth, '横'),
+                    (height, store.mapHeight, '縦'),
+                  ])
+                    TextFormField(
+                      controller: entry.$1,
+                      enabled: !saving,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: '${entry.$3}のマス数（${entry.$2}〜100）',
+                      ),
+                      validator: (value) {
+                        final number = int.tryParse(value ?? '');
+                        return number == null ||
+                                number < entry.$2 ||
+                                number > 100
+                            ? '${entry.$2}〜100 の整数を入力してください'
+                            : null;
+                      },
+                    ),
+                  if (error != null)
+                    Text(
+                      error!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: saving ? null : () => Navigator.pop(dialogContext),
+              child: const Text('キャンセル'),
+            ),
+            FilledButton(
+              onPressed: saving
+                  ? null
+                  : () async {
+                      if (!form.currentState!.validate()) return;
+                      update(() {
+                        saving = true;
+                        error = null;
+                      });
+                      try {
+                        await repository.expandMap(
+                          store.householdId,
+                          store.id,
+                          width: int.parse(width.text),
+                          height: int.parse(height.text),
+                        );
+                        if (dialogContext.mounted) {
+                          Navigator.pop(dialogContext);
+                        }
+                      } catch (_) {
+                        if (context.mounted) {
+                          update(() {
+                            saving = false;
+                            error = '保存できませんでした。もう一度お試しください。';
+                          });
+                        }
+                      }
+                    },
+              child: Text(saving ? '保存中…' : '広げる'),
+            ),
+          ],
+        ),
+      ),
+    );
+    await Navigator.of(context).push(route);
+    await route.completed;
+    width.dispose();
+    height.dispose();
   }
 
   void _selectObject(MapObject object) {
@@ -180,8 +312,9 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
   }
 
   Future<void> _showObjectEditor(String objectId) async {
+    final mapKey = _mapKey;
     final initialObject = ref
-        .read(mapEditorProvider(_mapKey))
+        .read(mapEditorProvider(mapKey))
         .valueOrNull
         ?.where((object) => object.id == objectId)
         .firstOrNull;
@@ -190,131 +323,145 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
     final labelController =
         TextEditingController(text: initialObject.label ?? '');
 
-    await showModalBottomSheet<void>(
-      context: context,
+    final navigator = Navigator.of(context);
+    final route = ModalBottomSheetRoute<void>(
+      capturedThemes:
+          InheritedTheme.capture(from: context, to: navigator.context),
+      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
       isScrollControlled: true,
       showDragHandle: true,
       builder: (context) {
         return Consumer(
           builder: (context, ref, child) {
             final object = ref
-                .watch(mapEditorProvider(_mapKey))
+                .watch(mapEditorProvider(mapKey))
                 .valueOrNull
                 ?.where((object) => object.id == objectId)
                 .firstOrNull;
-            if (object == null) return const SizedBox.shrink();
+            final store = ref
+                .watch(storesProvider(mapKey.householdId))
+                .valueOrNull
+                ?.where((store) => store.id == mapKey.storeId)
+                .firstOrNull;
+            if (object == null || store == null) return const SizedBox.shrink();
 
-            return Padding(
-              padding: EdgeInsets.fromLTRB(
-                20,
-                0,
-                20,
-                20 + MediaQuery.viewInsetsOf(context).bottom,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    _objectTitle(object.type),
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 16),
-                  if (object.type == MapObjectType.shelf) ...[
-                    TextField(
-                      controller: labelController,
-                      decoration: const InputDecoration(
-                        labelText: '売り場名',
-                        hintText: '例：乳製品、調味料',
-                        border: OutlineInputBorder(),
+            return SingleChildScrollView(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  20,
+                  0,
+                  20,
+                  20 + MediaQuery.viewInsetsOf(context).bottom,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      _objectTitle(object.type),
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 16),
+                    if (object.type == MapObjectType.shelf) ...[
+                      TextField(
+                        controller: labelController,
+                        decoration: const InputDecoration(
+                          labelText: '売り場名',
+                          hintText: '例：乳製品、調味料',
+                          border: OutlineInputBorder(),
+                        ),
+                        textInputAction: TextInputAction.done,
+                        onSubmitted: (value) {
+                          ref
+                              .read(mapEditorControllerProvider(mapKey))
+                              .updateDetails(
+                                id: object.id,
+                                label: value,
+                              );
+                        },
                       ),
-                      textInputAction: TextInputAction.done,
-                      onSubmitted: (value) {
-                        ref
-                            .read(mapEditorControllerProvider(_mapKey))
-                            .updateDetails(
+                      const SizedBox(height: 16),
+                      Text(
+                        'この棚にある商品カテゴリ',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final category in productCategories)
+                            FilterChip(
+                              label: Text(category.name),
+                              selected:
+                                  object.categoryIds.contains(category.id),
+                              onSelected: (selected) {
+                                final categoryIds = {
+                                  ...object.categoryIds,
+                                };
+                                if (selected) {
+                                  categoryIds.add(category.id);
+                                } else {
+                                  categoryIds.remove(category.id);
+                                }
+                                ref
+                                    .read(mapEditorControllerProvider(mapKey))
+                                    .updateDetails(
+                                      id: object.id,
+                                      categoryIds: categoryIds.toList(),
+                                    );
+                              },
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                    _SizeEditor(
+                      width: object.width,
+                      height: object.height,
+                      onResize: (width, height) {
+                        ref.read(mapEditorControllerProvider(mapKey)).resize(
                               id: object.id,
-                              label: value,
+                              width: width.clamp(1, store.mapWidth - object.x),
+                              height:
+                                  height.clamp(1, store.mapHeight - object.y),
+                              mapWidth: store.mapWidth,
+                              mapHeight: store.mapHeight,
                             );
                       },
                     ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'この棚にある商品カテゴリ',
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
+                    const SizedBox(height: 20),
+                    Row(
                       children: [
-                        for (final category in productCategories)
-                          FilterChip(
-                            label: Text(category.name),
-                            selected: object.categoryIds.contains(category.id),
-                            onSelected: (selected) {
-                              final categoryIds = {
-                                ...object.categoryIds,
-                              };
-                              if (selected) {
-                                categoryIds.add(category.id);
-                              } else {
-                                categoryIds.remove(category.id);
-                              }
+                        TextButton.icon(
+                          onPressed: () {
+                            ref
+                                .read(mapEditorControllerProvider(mapKey))
+                                .remove(object.id);
+                            Navigator.of(context).pop();
+                          },
+                          icon: const Icon(Icons.delete_outline),
+                          label: const Text('削除'),
+                        ),
+                        const Spacer(),
+                        FilledButton(
+                          onPressed: () {
+                            if (object.type == MapObjectType.shelf) {
                               ref
-                                  .read(mapEditorControllerProvider(_mapKey))
+                                  .read(mapEditorControllerProvider(mapKey))
                                   .updateDetails(
                                     id: object.id,
-                                    categoryIds: categoryIds.toList(),
+                                    label: labelController.text.trim(),
                                   );
-                            },
-                          ),
+                            }
+                            Navigator.of(context).pop();
+                          },
+                          child: const Text('完了'),
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 16),
                   ],
-                  _SizeEditor(
-                    width: object.width,
-                    height: object.height,
-                    onResize: (width, height) {
-                      ref.read(mapEditorControllerProvider(_mapKey)).resize(
-                            id: object.id,
-                            width: width.clamp(1, _columns - object.x),
-                            height: height.clamp(1, _rows - object.y),
-                          );
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      TextButton.icon(
-                        onPressed: () {
-                          ref
-                              .read(mapEditorControllerProvider(_mapKey))
-                              .remove(object.id);
-                          Navigator.of(context).pop();
-                        },
-                        icon: const Icon(Icons.delete_outline),
-                        label: const Text('削除'),
-                      ),
-                      const Spacer(),
-                      FilledButton(
-                        onPressed: () {
-                          if (object.type == MapObjectType.shelf) {
-                            ref
-                                .read(mapEditorControllerProvider(_mapKey))
-                                .updateDetails(
-                                  id: object.id,
-                                  label: labelController.text.trim(),
-                                );
-                          }
-                          Navigator.of(context).pop();
-                        },
-                        child: const Text('完了'),
-                      ),
-                    ],
-                  ),
-                ],
+                ),
               ),
             );
           },
@@ -322,6 +469,8 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
       },
     );
 
+    await navigator.push(route);
+    await route.completed;
     labelController.dispose();
   }
 
@@ -344,7 +493,7 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
       ),
     );
 
-    if (shouldDelete == true) {
+    if (shouldDelete == true && mounted) {
       ref.read(mapEditorControllerProvider(_mapKey)).remove(object.id);
       if (_selectedObjectId == object.id) {
         setState(() => _selectedObjectId = null);
@@ -585,5 +734,6 @@ class _GridPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _GridPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _GridPainter oldDelegate) =>
+      columns != oldDelegate.columns || rows != oldDelegate.rows;
 }

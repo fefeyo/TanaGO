@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../map_editor/domain/map_object.dart';
+import '../../map_editor/presentation/map_viewport.dart';
+import '../../stores/presentation/store_controller.dart';
 import '../../map_editor/domain/store_map_key.dart';
 import '../../map_editor/presentation/map_editor_controller.dart';
 import '../../household/presentation/household_controller.dart';
@@ -22,9 +24,6 @@ class ShoppingMapPage extends ConsumerStatefulWidget {
 }
 
 class _ShoppingMapPageState extends ConsumerState<ShoppingMapPage> {
-  static const _columns = 12;
-  static const _rows = 16;
-
   String? _selectedShelfId;
 
   @override
@@ -34,6 +33,10 @@ class _ShoppingMapPageState extends ConsumerState<ShoppingMapPage> {
       householdId: household.id,
       storeId: widget.storeId,
     );
+    final storesAsync = ref.watch(storesProvider(household.id));
+    final store = storesAsync.valueOrNull
+        ?.where((store) => store.id == widget.storeId)
+        .firstOrNull;
     final objectsAsync = ref.watch(mapEditorProvider(mapKey));
     final shoppingItemsAsync = ref.watch(shoppingListProvider(household.id));
     final objects = objectsAsync.valueOrNull ?? const <MapObject>[];
@@ -90,59 +93,48 @@ class _ShoppingMapPageState extends ConsumerState<ShoppingMapPage> {
             Expanded(
               child: objects.isEmpty
                   ? const _EmptyMap()
-                  : LayoutBuilder(
-                      builder: (context, constraints) {
-                        final mapWidth = constraints.maxWidth - 32;
-                        final cellSize = mapWidth / _columns;
-                        final mapHeight = cellSize * _rows;
-
-                        return SingleChildScrollView(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: SizedBox(
-                            width: mapWidth,
-                            height: mapHeight,
-                            child: Stack(
-                              children: [
-                                Positioned.fill(
-                                  child: DecoratedBox(
-                                    decoration: BoxDecoration(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .surfaceContainerLowest,
-                                      borderRadius: BorderRadius.circular(20),
-                                      border: Border.all(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .outlineVariant,
-                                      ),
-                                    ),
+                  : store == null
+                      ? Center(
+                          child: Text(
+                            storesAsync.isLoading
+                                ? '店舗を読み込み中…'
+                                : '店舗を読み込めませんでした',
+                          ),
+                        )
+                      : MapViewport(
+                          columns: store.mapWidth,
+                          rows: store.mapHeight,
+                          builder: (_) => Stack(
+                            children: [
+                              Positioned.fill(
+                                child: ColoredBox(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .surfaceContainerLowest,
+                                ),
+                              ),
+                              for (final object in objects)
+                                Positioned(
+                                  left: object.x * MapViewport.cellSize,
+                                  top: object.y * MapViewport.cellSize,
+                                  width: object.width * MapViewport.cellSize,
+                                  height: object.height * MapViewport.cellSize,
+                                  child: _ShoppingMapObject(
+                                    object: object,
+                                    isRequired:
+                                        highlightedShelfIds.contains(object.id),
+                                    isSelected: _selectedShelfId == object.id,
+                                    onTap: object.type == MapObjectType.shelf
+                                        ? () => setState(
+                                              () =>
+                                                  _selectedShelfId = object.id,
+                                            )
+                                        : null,
                                   ),
                                 ),
-                                for (final object in objects)
-                                  Positioned(
-                                    left: object.x * cellSize,
-                                    top: object.y * cellSize,
-                                    width: object.width * cellSize,
-                                    height: object.height * cellSize,
-                                    child: _ShoppingMapObject(
-                                      object: object,
-                                      isRequired: highlightedShelfIds
-                                          .contains(object.id),
-                                      isSelected: _selectedShelfId == object.id,
-                                      onTap: object.type == MapObjectType.shelf
-                                          ? () => setState(
-                                                () => _selectedShelfId =
-                                                    object.id,
-                                              )
-                                          : null,
-                                    ),
-                                  ),
-                              ],
-                            ),
+                            ],
                           ),
-                        );
-                      },
-                    ),
+                        ),
             ),
             _ShelfItemsPanel(
               shelf: selectedShelf,

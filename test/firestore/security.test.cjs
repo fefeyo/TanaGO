@@ -173,3 +173,22 @@ test('a member of another household cannot access this household', async () => {
   await assertFails(setDoc(doc(client, 'households/home/stores/s'), store));
   await assertFails(setDoc(doc(client, 'households/home/stores/s/mapObjects/o'), shelf));
 });
+
+test('members can expand maps to 100 by 100 without shrinking or reviving deleted stores', async () => {
+  await create(); await join();
+  const path = 'households/home/stores/s';
+  const owner = doc(db('owner'), path), guest = doc(db('guest'), path);
+  await assertSucceeds(setDoc(owner, store));
+  await assertSucceeds(setDoc(doc(db('owner'), path + '/mapObjects/o'), shelf));
+  await assertFails(updateDoc(doc(db('outsider'), path), { mapWidth: 100, mapHeight: 100 }));
+  await assertFails(updateDoc(guest, { mapWidth: 11 }));
+  await assertFails(updateDoc(guest, { mapWidth: 101 }));
+  await assertFails(updateDoc(guest, { mapHeight: 32.5 }));
+  await assertFails(updateDoc(guest, { name: 'other', mapWidth: 24 }));
+  await assertSucceeds(updateDoc(guest, { mapWidth: 100, mapHeight: 100 }));
+  await assertSucceeds(updateDoc(doc(db('guest'), path + '/mapObjects/o'), { x: 97, y: 99 }));
+  await assertFails(updateDoc(doc(db('guest'), path + '/mapObjects/o'), { x: 98 }));
+  await assertFails(updateDoc(guest, { mapHeight: 99 }));
+  await assertSucceeds(updateDoc(owner, { deleting: true }));
+  await assertFails(updateDoc(guest, { mapWidth: 100, mapHeight: 100, deleting: false }));
+});

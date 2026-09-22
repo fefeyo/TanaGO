@@ -11,6 +11,44 @@ import 'package:tanago/src/features/stores/data/firestore_store_repository.dart'
 import 'package:tanago/src/features/stores/domain/store.dart';
 
 void main() {
+  test('map expansion keeps dimensions monotonic and preserves objects',
+      () async {
+    final db = FakeFirebaseFirestore();
+    final repository = FirestoreStoreRepository(db);
+    await repository.addStore(
+      'h',
+      const Store(
+        id: 's',
+        householdId: 'h',
+        name: '店',
+        mapWidth: 12,
+        mapHeight: 16,
+      ),
+    );
+    final object = db.doc('households/h/stores/s/mapObjects/o');
+    await object.set({'x': 1, 'y': 2});
+    await repository.expandMap('h', 's', width: 24, height: 32);
+    await repository.expandMap('h', 's', width: 12, height: 64);
+    final store = (await repository.getStores('h')).single;
+    expect(store.mapWidth, 24);
+    expect(store.mapHeight, 64);
+    expect(store.name, '店');
+    expect((await object.get()).data(), {'x': 1, 'y': 2});
+    await expectLater(
+      repository.expandMap('h', 's', width: 101, height: 64),
+      throwsArgumentError,
+    );
+    await expectLater(
+      repository.expandMap('other', 's', width: 24, height: 32),
+      throwsStateError,
+    );
+    await db.doc('households/h/stores/s').update({'deleting': true});
+    await expectLater(
+      repository.expandMap('h', 's', width: 40, height: 64),
+      throwsStateError,
+    );
+  });
+
   test('Firestore create and join preserve owner and reject another household',
       () async {
     final db = FakeFirebaseFirestore();

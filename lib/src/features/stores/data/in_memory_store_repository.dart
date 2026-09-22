@@ -25,6 +25,36 @@ class InMemoryStoreRepository implements StoreRepository {
   }
 
   @override
+  Future<void> expandMap(
+    String householdId,
+    String storeId, {
+    required int width,
+    required int height,
+  }) async {
+    if (width < 1 || width > 100 || height < 1 || height > 100) {
+      throw ArgumentError('Map dimensions must be between 1 and 100');
+    }
+    final stores = _stores[householdId] ?? const <Store>[];
+    if (!stores.any((store) => store.id == storeId)) {
+      throw StateError('Store is unavailable');
+    }
+    _stores[householdId] = [
+      for (final store in stores)
+        if (store.id == storeId)
+          Store(
+            id: store.id,
+            householdId: store.householdId,
+            name: store.name,
+            mapWidth: width.clamp(store.mapWidth, 100),
+            mapHeight: height.clamp(store.mapHeight, 100),
+          )
+        else
+          store,
+    ];
+    _emit(householdId);
+  }
+
+  @override
   Future<void> removeStore(String householdId, String storeId) async {
     _stores[householdId] = [
       for (final store in _stores[householdId] ?? const <Store>[])

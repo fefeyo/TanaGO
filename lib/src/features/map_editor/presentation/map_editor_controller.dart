@@ -40,42 +40,53 @@ class MapEditorController {
     required MapObjectType type,
     required int x,
     required int y,
+    int mapWidth = 12,
+    int mapHeight = 16,
   }) {
     return _repository.saveObject(
       _key,
       MapObject(
         id: _uuid.v4(),
         type: type,
-        x: x,
-        y: y,
+        x: x.clamp(0, mapWidth - (type == MapObjectType.shelf ? 3 : 1)),
+        y: y.clamp(0, mapHeight - 1),
         width: type == MapObjectType.shelf ? 3 : 1,
         height: 1,
       ),
     );
   }
 
-  Future<void> move({required String id, required int x, required int y}) {
-    return _repository.updateObject(
-      _key,
-      id,
-      (object) => object.copyWith(
-        x: x.clamp(0, 12 - object.width),
-        y: y.clamp(0, 16 - object.height),
-      ),
-    );
+  Future<MapObject?> move({
+    required String id,
+    required int x,
+    required int y,
+    int mapWidth = 12,
+    int mapHeight = 16,
+  }) async {
+    MapObject? saved;
+    await _repository.updateObject(_key, id, (object) {
+      saved = object.copyWith(
+        x: x.clamp(0, mapWidth - object.width),
+        y: y.clamp(0, mapHeight - object.height),
+      );
+      return saved!;
+    });
+    return saved;
   }
 
   Future<void> resize({
     required String id,
     required int width,
     required int height,
+    int mapWidth = 12,
+    int mapHeight = 16,
   }) {
     return _repository.updateObject(
       _key,
       id,
       (object) => object.copyWith(
-        width: width.clamp(1, 12 - object.x),
-        height: height.clamp(1, 16 - object.y),
+        width: width.clamp(1, mapWidth - object.x),
+        height: height.clamp(1, mapHeight - object.y),
       ),
     );
   }
