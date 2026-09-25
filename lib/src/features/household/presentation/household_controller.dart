@@ -49,7 +49,7 @@ class HouseholdController {
   final HouseholdRepository _repository;
   final AuthRepository _authRepository;
 
-  Future<Household> create(String name) async {
+  Future<Household> create(String name, {String? displayName}) async {
     final trimmed = name.trim();
     if (trimmed.isEmpty) {
       throw const HouseholdValidationException('世帯名を入力してください');
@@ -59,11 +59,13 @@ class HouseholdController {
     return _repository.createHousehold(
       name: trimmed,
       ownerUid: user.uid,
-      ownerDisplayName: user.displayName,
+      ownerDisplayName: displayName?.trim().isNotEmpty == true
+          ? displayName!.trim()
+          : user.displayName,
     );
   }
 
-  Future<Household> join(String inviteCode) async {
+  Future<Household> join(String inviteCode, {String? displayName}) async {
     final trimmed = inviteCode.trim();
     if (trimmed.isEmpty) {
       throw const HouseholdValidationException('招待コードを入力してください');
@@ -73,8 +75,15 @@ class HouseholdController {
     return _repository.joinHousehold(
       inviteCode: trimmed,
       uid: user.uid,
-      displayName: user.displayName,
+      displayName: displayName?.trim().isNotEmpty == true
+          ? displayName!.trim()
+          : user.displayName,
     );
+  }
+
+  Future<void> updateMyName(String householdId, String name) async {
+    final user = _authRepository.currentUser ?? await _authRepository.signIn();
+    await _repository.updateMemberName(householdId, user.uid, name);
   }
 
   Future<String> getInviteCode(String householdId) {

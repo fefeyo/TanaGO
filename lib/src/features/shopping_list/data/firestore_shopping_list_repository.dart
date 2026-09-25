@@ -52,6 +52,18 @@ class FirestoreShoppingListRepository implements ShoppingListRepository {
   }
 
   @override
+  Future<void> removeItems(String householdId, Set<String> itemIds) async {
+    final ids = itemIds.toList();
+    for (var offset = 0; offset < ids.length; offset += 400) {
+      final batch = _firestore.batch();
+      for (final id in ids.skip(offset).take(400)) {
+        batch.delete(_items(householdId).doc(id));
+      }
+      await batch.commit();
+    }
+  }
+
+  @override
   Future<void> removeItem(String householdId, String itemId) {
     return _items(householdId).doc(itemId).delete();
   }

@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tanago/src/features/product_categories/data/firestore_category_repository.dart';
+import 'package:tanago/src/features/product_categories/domain/product_category.dart';
 import 'package:tanago/src/features/household/data/firestore_household_repository.dart';
 import 'package:tanago/src/features/map_editor/data/firestore_map_repository.dart';
 import 'package:tanago/src/features/map_editor/domain/map_object.dart';
@@ -11,6 +13,112 @@ import 'package:tanago/src/features/stores/data/firestore_store_repository.dart'
 import 'package:tanago/src/features/stores/domain/store.dart';
 
 void main() {
+  test(
+      'custom category names stay shared, rename preserves IDs and duplicates are rejected',
+      () async {
+    final db = FakeFirebaseFirestore();
+    final repository = FirestoreCategoryRepository(db);
+    expect(await repository.watchCategories('h').first, isEmpty);
+    await repository.save(
+      'h',
+      const ProductCategory(id: 'custom_a', name: '健康食品'),
+    );
+    await repository.save(
+      'h',
+      const ProductCategory(id: 'custom_b', name: 'ペット'),
+    );
+    await repository.save(
+      'h',
+      const ProductCategory(id: 'custom_a', name: 'サプリ'),
+    );
+    expect(
+      (await db.doc('households/h/categoryCatalog/active').get())
+          .data()?['names']['custom_a'],
+      'サプリ',
+    );
+    final categories = await repository
+        .watchCategories('h')
+        .firstWhere(
+          (values) => values.any((c) => c.id == 'custom_a' && c.name == 'サプリ'),
+        )
+        .timeout(const Duration(seconds: 2));
+    expect(categories, hasLength(2));
+    expect(categories.singleWhere((c) => c.id == 'custom_a').name, 'サプリ');
+    expect(await repository.watchCategories('other').first, isEmpty);
+    await expectLater(
+      repository.save(
+        'h',
+        const ProductCategory(id: 'custom_c', name: 'サプリ'),
+      ),
+      throwsStateError,
+    );
+    expect(
+      (await db.doc('households/h/categoryCatalog/active').get())
+          .data()?['lastEditedId'],
+      'custom_a',
+    );
+  });
+
+  test(
+      'purchase completion deletes selected IDs across batches and leaves other households intact',
+      () async {
+    final db = FakeFirebaseFirestore();
+    final repository = FirestoreShoppingListRepository(db);
+    for (var i = 0; i < 405; i++) {
+      await repository.addItem(
+        'h',
+        ShoppingItem(
+          id: '$i',
+          name: '商品$i',
+          addedByUid: 'u',
+          createdAt: DateTime(2026),
+        ),
+      );
+    }
+    await repository.addItem(
+      'other',
+      ShoppingItem(
+        id: '0',
+        name: '別世帯',
+        addedByUid: 'u',
+        createdAt: DateTime(2026),
+      ),
+    );
+    final ids = {for (var i = 0; i < 404; i++) '$i'};
+    await repository.removeItems('h', ids);
+    await repository.removeItems('h', ids);
+    expect((await repository.getItems('h')).single.id, '404');
+    expect((await repository.getItems('other')).single.name, '別世帯');
+  });
+
+  test('member rename preserves role, joining information and the other member',
+      () async {
+    final db = FakeFirebaseFirestore();
+    final repository = FirestoreHouseholdRepository(db);
+    final home = await repository.createHousehold(
+      name: '家',
+      ownerUid: 'a',
+      ownerDisplayName: 'あなた',
+    );
+    await repository.joinHousehold(
+      inviteCode: await repository.getInviteCode(home.id),
+      uid: 'b',
+      displayName: 'あき',
+    );
+    final before =
+        (await db.doc('households/${home.id}/members/a').get()).data()!;
+    await repository.updateMemberName(home.id, 'a', 'ゆう');
+    final after =
+        (await db.doc('households/${home.id}/members/a').get()).data()!;
+    expect(after, {...before, 'displayName': 'ゆう'});
+    expect(
+      (await repository.watchMembers(home.id).first)
+          .singleWhere((m) => m.uid == 'b')
+          .displayName,
+      'あき',
+    );
+  });
+
   test('map expansion keeps dimensions monotonic and preserves objects',
       () async {
     final db = FakeFirebaseFirestore();

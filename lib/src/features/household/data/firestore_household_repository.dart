@@ -155,6 +155,17 @@ class FirestoreHouseholdRepository implements HouseholdRepository {
   }
 
   @override
+  Future<void> updateMemberName(String householdId, String uid, String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty || trimmed.length > 100) {
+      throw ArgumentError('名前は1〜100文字で入力してください');
+    }
+    return _firestore
+        .doc('households/$householdId/members/$uid')
+        .update({'displayName': trimmed});
+  }
+
+  @override
   Future<String> getInviteCode(String householdId) async {
     final household =
         await _firestore.collection('households').doc(householdId).get();

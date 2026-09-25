@@ -7,7 +7,8 @@ import '../domain/store.dart';
 import 'store_controller.dart';
 
 class StoreListPage extends ConsumerWidget {
-  const StoreListPage({super.key});
+  const StoreListPage({super.key, this.shopping = false});
+  final bool shopping;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -16,82 +17,131 @@ class StoreListPage extends ConsumerWidget {
     final stores = storesAsync.valueOrNull ?? const <Store>[];
 
     return Scaffold(
-      appBar: AppBar(title: const Text('店舗を選ぶ')),
-      body: stores.isEmpty
-          ? const Center(
-              child: Padding(
-                padding: EdgeInsets.all(24),
-                child: Text(
-                  'まだ店舗がありません。\nよく行くスーパーを登録しましょう。',
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            )
-          : ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: stores.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
-              itemBuilder: (context, index) {
-                final store = stores[index];
-                return Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.storefront),
-                    title: Text(store.name),
-                    subtitle: const Text('店内マップで売り場を確認'),
-                    trailing: IconButton(
-                      tooltip: '店内マップを編集',
-                      onPressed: () =>
-                          context.push('/stores/${store.id}/map/edit'),
-                      icon: const Icon(Icons.edit_outlined),
-                    ),
-                    onTap: () => context.push('/stores/${store.id}/map'),
+      appBar: AppBar(title: Text(shopping ? '買い物する店舗を選ぶ' : '店舗を管理')),
+      body: storesAsync.isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : storesAsync.hasError
+              ? Center(
+                  child: TextButton(
+                    onPressed: () =>
+                        ref.invalidate(storesProvider(household.id)),
+                    child: const Text('店舗を再読み込み'),
                   ),
-                );
-              },
-            ),
+                )
+              : stores.isEmpty
+                  ? const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Text(
+                          'まだ店舗がありません。\nよく行くスーパーを登録しましょう。',
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: stores.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
+                        final store = stores[index];
+                        return Card(
+                          child: ListTile(
+                            leading: const Icon(Icons.storefront),
+                            title: Text(store.name),
+                            subtitle: Text(
+                              shopping ? 'この店で買うものを選ぶ' : '店内マップと棚のカテゴリを編集',
+                            ),
+                            trailing: IconButton(
+                              tooltip: '店内マップを編集',
+                              onPressed: () =>
+                                  context.push('/stores/${store.id}/map/edit'),
+                              icon: const Icon(Icons.edit_outlined),
+                            ),
+                            onTap: () => context.push(
+                              '/stores/${store.id}/${shopping ? 'select' : 'map/edit'}',
+                            ),
+                          ),
+                        );
+                      },
+                    ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showAddStoreDialog(context, ref, household.id),
+        onPressed: () => showDialog<void>(
+          context: context,
+          builder: (_) => _AddStoreDialog(householdId: household.id),
+        ),
         icon: const Icon(Icons.add_business),
         label: const Text('店舗を追加'),
       ),
     );
   }
+}
 
-  Future<void> _showAddStoreDialog(
-    BuildContext context,
-    WidgetRef ref,
-    String householdId,
-  ) async {
-    final controller = TextEditingController();
-    final name = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
+class _AddStoreDialog extends ConsumerStatefulWidget {
+  const _AddStoreDialog({required this.householdId});
+  final String householdId;
+  @override
+  ConsumerState<_AddStoreDialog> createState() => _AddStoreDialogState();
+}
+
+class _AddStoreDialogState extends ConsumerState<_AddStoreDialog> {
+  final _name = TextEditingController();
+  bool _saving = false;
+  String? _error;
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (_saving) return;
+    if (_name.text.trim().isEmpty) {
+      setState(() => _error = '店舗名を入力してください');
+      return;
+    }
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await ref
+          .read(storeControllerProvider(widget.householdId))
+          .add(_name.text);
+      if (mounted) Navigator.pop(context);
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _saving = false;
+          _error = '店舗を保存できませんでした';
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
         title: const Text('店舗を追加'),
         content: TextField(
-          controller: controller,
+          controller: _name,
+          enabled: !_saving,
           autofocus: true,
-          decoration: const InputDecoration(
+          maxLength: 100,
+          decoration: InputDecoration(
             labelText: '店舗名',
-            hintText: '例: ○○スーパー △△店',
+            hintText: '例：○○スーパー',
+            errorText: _error,
           ),
-          onSubmitted: (value) => Navigator.pop(context, value),
+          onSubmitted: (_) => _save(),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: _saving ? null : () => Navigator.pop(context),
             child: const Text('キャンセル'),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(context, controller.text),
-            child: const Text('追加'),
+            onPressed: _saving ? null : _save,
+            child: Text(_saving ? '保存中…' : '追加'),
           ),
         ],
-      ),
-    );
-    controller.dispose();
-
-    if (name != null) {
-      ref.read(storeControllerProvider(householdId)).add(name);
-    }
-  }
+      );
 }

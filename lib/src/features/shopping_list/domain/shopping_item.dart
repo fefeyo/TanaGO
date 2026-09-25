@@ -25,6 +25,7 @@ class ShoppingItem {
     bool? isPurchased,
     String? purchasedByUid,
     DateTime? purchasedAt,
+    bool clearCategory = false,
     bool clearPurchasedByUid = false,
     bool clearPurchasedAt = false,
   }) {
@@ -33,7 +34,7 @@ class ShoppingItem {
       name: name ?? this.name,
       addedByUid: addedByUid,
       createdAt: createdAt,
-      categoryId: categoryId ?? this.categoryId,
+      categoryId: clearCategory ? null : categoryId ?? this.categoryId,
       isPurchased: isPurchased ?? this.isPurchased,
       purchasedByUid:
           clearPurchasedByUid ? null : purchasedByUid ?? this.purchasedByUid,

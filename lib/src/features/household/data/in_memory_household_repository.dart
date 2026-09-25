@@ -97,6 +97,28 @@ class InMemoryHouseholdRepository implements HouseholdRepository {
   }
 
   @override
+  Future<void> updateMemberName(
+    String householdId,
+    String uid,
+    String name,
+  ) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty || trimmed.length > 100) {
+      throw ArgumentError('名前は1〜100文字で入力してください');
+    }
+    final members = _members[householdId] ?? [];
+    if (!members.any((m) => m.uid == uid)) throw StateError('メンバーが見つかりません');
+    _members[householdId] = [
+      for (final m in members)
+        if (m.uid == uid)
+          HouseholdMember(uid: uid, displayName: trimmed, role: m.role)
+        else
+          m,
+    ];
+    _emitMembers(householdId);
+  }
+
+  @override
   Future<String> getInviteCode(String householdId) async {
     final code = _inviteCodes[householdId];
     if (code == null) {

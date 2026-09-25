@@ -44,7 +44,11 @@ class ShoppingListController {
   final AuthRepository _authRepository;
   final String _householdId;
 
-  Future<void> add(String name, {String? categoryId}) async {
+  Future<void> add(
+    String name, {
+    String? categoryId,
+    bool autoClassify = true,
+  }) async {
     final trimmed = name.trim();
     if (trimmed.isEmpty) {
       return;
@@ -59,10 +63,30 @@ class ShoppingListController {
         name: trimmed,
         addedByUid: user.uid,
         createdAt: DateTime.now(),
-        categoryId: categoryId ?? _categoryClassifier.classify(trimmed),
+        categoryId: categoryId ??
+            (autoClassify ? _categoryClassifier.classify(trimmed) : null),
       ),
     );
   }
+
+  Future<void> edit(String id, {required String name, String? categoryId}) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty || trimmed.length > 200) {
+      throw ArgumentError('商品名は1〜200文字で入力してください');
+    }
+    return _repository.updateItem(
+      _householdId,
+      id,
+      (item) => item.copyWith(
+        name: trimmed,
+        categoryId: categoryId,
+        clearCategory: categoryId == null,
+      ),
+    );
+  }
+
+  Future<void> complete(Iterable<String> ids) =>
+      _repository.removeItems(_householdId, ids.toSet());
 
   Future<void> updateCategory(String id, String categoryId) {
     return _repository.updateItem(

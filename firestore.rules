@@ -21,6 +21,10 @@ service cloud.firestore {
       return ['produce', 'meat', 'seafood', 'dairy', 'frozen', 'bakery', 'snacks',
               'beverages', 'dry_goods', 'seasonings', 'prepared_food', 'daily_goods'];
     }
+    function allowedCategories(hid) {
+      let path = /databases/$(database)/documents/households/$(hid)/categoryCatalog/active;
+      return exists(path) ? categories().concat(get(path).data.names.keys()) : categories();
+    }
     match /users/{uid} {
       allow get: if signedIn() && request.auth.uid == uid;
       allow create: if signedIn() && request.auth.uid == uid
@@ -77,7 +81,28 @@ service cloud.firestore {
               && get(invitePath(request.resource.data.inviteCode)).data.householdId == hid
               && get(householdPath(hid)).data.inviteCode == request.resource.data.inviteCode)
           );
+        allow update: if member(hid) && request.auth.uid == uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName'])
+          && text(request.resource.data.displayName, 100);
         // Role changes, member deletion and moving households are not MVP APIs.
+      }
+      match /categoryCatalog/{catalogId} {
+        function validEntry(names, id) {
+          return id is string && id.matches('^custom_[0-9a-f-]{36}$')
+            && text(names[id], 50);
+        }
+        function validCatalog() {
+          let d = request.resource.data;
+          return d.keys().hasOnly(['names', 'lastEditedId']) && d.names is map && d.names.size() <= 200;
+        }
+        allow read: if member(hid) && catalogId == 'active';
+        allow create: if member(hid) && catalogId == 'active' && validCatalog()
+          && request.resource.data.names.size() == 1
+          && validEntry(request.resource.data.names, request.resource.data.lastEditedId);
+        allow update: if member(hid) && catalogId == 'active' && validCatalog()
+          && request.resource.data.names.diff(resource.data.names).removedKeys().size() == 0
+          && request.resource.data.names.diff(resource.data.names).affectedKeys().hasOnly([request.resource.data.lastEditedId])
+          && validEntry(request.resource.data.names, request.resource.data.lastEditedId);
       }
       match /shoppingLists/{listId} {
         allow read: if member(hid) && listId == 'active';
@@ -87,7 +112,7 @@ service cloud.firestore {
             return d.keys().hasAll(['name', 'addedByUid', 'createdAt', 'categoryId', 'isPurchased', 'purchasedByUid', 'purchasedAt'])
               && d.keys().hasOnly(['name', 'addedByUid', 'createdAt', 'categoryId', 'isPurchased', 'purchasedByUid', 'purchasedAt'])
               && text(d.name, 200) && text(d.addedByUid, 128) && d.createdAt is timestamp
-              && (d.categoryId == null || d.categoryId in categories())
+              && (d.categoryId == null || d.categoryId in allowedCategories(hid))
               && d.isPurchased is bool
               && ((d.isPurchased && text(d.purchasedByUid, 128) && d.purchasedAt is timestamp)
                 || (!d.isPurchased && d.purchasedByUid == null && d.purchasedAt == null));
@@ -134,8 +159,8 @@ service cloud.firestore {
               && d.x >= 0 && d.y >= 0 && d.width > 0 && d.height > 0
               && d.x + d.width <= store.mapWidth && d.y + d.height <= store.mapHeight
               && (d.label == null || (d.label is string && d.label.size() <= 100))
-              && d.categoryIds is list && d.categoryIds.size() <= 12
-              && d.categoryIds.hasOnly(categories())
+              && d.categoryIds is list && d.categoryIds.size() <= 50
+              && d.categoryIds.hasOnly(allowedCategories(hid))
               && (d.type == 'shelf' || d.categoryIds.size() == 0);
           }
           allow read, delete: if member(hid);

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../../shopping_trip/presentation/shopping_trip_controller.dart';
 
 import '../../map_editor/domain/map_object.dart';
 import '../../map_editor/presentation/map_viewport.dart';
@@ -8,7 +10,6 @@ import '../../map_editor/domain/store_map_key.dart';
 import '../../map_editor/presentation/map_editor_controller.dart';
 import '../../household/presentation/household_controller.dart';
 import '../../shopping_list/domain/shopping_item.dart';
-import '../../shopping_list/presentation/shopping_list_controller.dart';
 import '../domain/shopping_map_matcher.dart';
 
 class ShoppingMapPage extends ConsumerStatefulWidget {
@@ -38,24 +39,26 @@ class _ShoppingMapPageState extends ConsumerState<ShoppingMapPage> {
         ?.where((store) => store.id == widget.storeId)
         .firstOrNull;
     final objectsAsync = ref.watch(mapEditorProvider(mapKey));
-    final shoppingItemsAsync = ref.watch(shoppingListProvider(household.id));
+    final shoppingItemsAsync = ref.watch(storeShoppingItemsProvider(mapKey));
+    final trip = ref.watch(shoppingTripProvider(mapKey));
     final objects = objectsAsync.valueOrNull ?? const <MapObject>[];
     final shoppingItems =
-        shoppingItemsAsync.valueOrNull ?? const <ShoppingItem>[];
-    final pendingItems = shoppingItems
-        .where((item) => !item.isPurchased && item.categoryId != null)
-        .toList();
+        (shoppingItemsAsync.valueOrNull ?? const <ShoppingItem>[])
+            .where((item) => trip.selected.contains(item.id))
+            .toList();
+    final pendingItems =
+        shoppingItems.where((item) => !trip.checked.contains(item.id)).toList();
 
     final highlightedShelfIds = requiredShelfIds(
       objects: objects,
-      shoppingItems: shoppingItems,
+      shoppingItems: pendingItems,
     );
 
     final selectedShelf =
         objects.where((object) => object.id == _selectedShelfId).firstOrNull;
 
     final selectedItems = selectedShelf == null
-        ? const <ShoppingItem>[]
+        ? shoppingItems
         : itemsForShelf(
             shelf: selectedShelf,
             shoppingItems: shoppingItems,
@@ -64,6 +67,12 @@ class _ShoppingMapPageState extends ConsumerState<ShoppingMapPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('店内マップ'),
+        actions: [
+          TextButton(
+            onPressed: () => context.push('/stores/${widget.storeId}/select'),
+            child: const Text('商品を選び直す'),
+          ),
+        ],
       ),
       body: SafeArea(
         child: Column(
@@ -74,7 +83,7 @@ class _ShoppingMapPageState extends ConsumerState<ShoppingMapPage> {
                 children: [
                   Expanded(
                     child: Text(
-                      '買うものがある棚を確認',
+                      '残り${pendingItems.length}点',
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                   ),
@@ -90,6 +99,8 @@ class _ShoppingMapPageState extends ConsumerState<ShoppingMapPage> {
                 ],
               ),
             ),
+            if (shoppingItemsAsync.hasError) const Text('買うものを読み込めませんでした'),
+            if (shoppingItemsAsync.isLoading) const LinearProgressIndicator(),
             Expanded(
               child: objects.isEmpty
                   ? const _EmptyMap()
@@ -139,10 +150,26 @@ class _ShoppingMapPageState extends ConsumerState<ShoppingMapPage> {
             _ShelfItemsPanel(
               shelf: selectedShelf,
               items: selectedItems,
-              hasRequiredShelves: highlightedShelfIds.isNotEmpty,
+              checked: trip.checked,
+              onClearShelf: () => setState(() => _selectedShelfId = null),
               onTogglePurchased: (id) => ref
-                  .read(shoppingListControllerProvider(household.id))
-                  .togglePurchased(id),
+                  .read(shoppingTripProvider(mapKey).notifier)
+                  .check(id, !trip.checked.contains(id)),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: shoppingItems
+                          .any((i) => trip.checked.contains(i.id))
+                      ? () => context.push('/stores/${widget.storeId}/complete')
+                      : null,
+                  child: Text(
+                    'チェックした${shoppingItems.where((i) => trip.checked.contains(i.id)).length}点の購入を完了する',
+                  ),
+                ),
+              ),
             ),
           ],
         ),
@@ -255,19 +282,21 @@ class _ShelfItemsPanel extends StatelessWidget {
   const _ShelfItemsPanel({
     required this.shelf,
     required this.items,
-    required this.hasRequiredShelves,
     required this.onTogglePurchased,
+    required this.checked,
+    required this.onClearShelf,
   });
 
   final MapObject? shelf;
   final List<ShoppingItem> items;
-  final bool hasRequiredShelves;
   final ValueChanged<String> onTogglePurchased;
+  final Set<String> checked;
+  final VoidCallback onClearShelf;
 
   @override
   Widget build(BuildContext context) {
     final title = shelf == null
-        ? 'このお店で買うもの'
+        ? '今回買うもの'
         : shelf!.label?.isNotEmpty == true
             ? '${shelf!.label}で買うもの'
             : 'この棚で買うもの';
@@ -307,13 +336,9 @@ class _ShelfItemsPanel extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          if (shelf == null)
-            Text(
-              hasRequiredShelves
-                  ? '光っている棚をタップすると、ここに商品が表示されます。'
-                  : '売り場が設定された未購入の商品はありません。',
-            )
-          else if (items.isEmpty)
+          if (shelf != null)
+            TextButton(onPressed: onClearShelf, child: const Text('すべての商品を表示')),
+          if (items.isEmpty)
             const Text('この棚で買うものはありません。')
           else
             Flexible(
@@ -326,7 +351,7 @@ class _ShelfItemsPanel extends StatelessWidget {
                   return CheckboxListTile(
                     contentPadding: EdgeInsets.zero,
                     dense: true,
-                    value: item.isPurchased,
+                    value: checked.contains(item.id),
                     title: Text(item.name),
                     onChanged: (_) => onTogglePurchased(item.id),
                   );

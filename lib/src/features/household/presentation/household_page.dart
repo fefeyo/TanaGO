@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/household.dart';
+import '../../auth/presentation/auth_controller.dart';
+import 'member_name_dialog.dart';
 import 'household_controller.dart';
 
 class HouseholdPage extends ConsumerWidget {
@@ -15,6 +17,7 @@ class HouseholdPage extends ConsumerWidget {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
+    final myUid = ref.watch(authUserProvider).valueOrNull?.uid;
     final members =
         ref.watch(householdMembersProvider(household.id)).valueOrNull ??
             const <HouseholdMember>[];
@@ -38,10 +41,25 @@ class HouseholdPage extends ConsumerWidget {
               contentPadding: EdgeInsets.zero,
               leading: CircleAvatar(
                 child: Text(
-                  member.displayName.isEmpty ? '?' : member.displayName[0],
+                  memberName(members, member.uid).characters.first,
                 ),
               ),
-              title: Text(member.displayName),
+              title: Text(
+                '${memberName(members, member.uid)}${member.uid == myUid ? '（自分）' : ''}',
+              ),
+              trailing: member.uid == myUid
+                  ? IconButton(
+                      tooltip: '名前を変更',
+                      icon: const Icon(Icons.edit_outlined),
+                      onPressed: () => showDialog<void>(
+                        context: context,
+                        builder: (_) => MemberNameDialog(
+                          householdId: household.id,
+                          name: member.displayName,
+                        ),
+                      ),
+                    )
+                  : null,
               subtitle: Text(
                 member.role == HouseholdRole.owner ? 'オーナー' : 'メンバー',
               ),

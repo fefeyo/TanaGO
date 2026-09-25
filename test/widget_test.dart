@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tanago/src/app.dart';
+import 'package:tanago/src/features/product_categories/data/in_memory_category_repository.dart';
+import 'package:tanago/src/features/product_categories/presentation/category_controller.dart';
 import 'package:tanago/src/features/auth/data/in_memory_auth_repository.dart';
 import 'package:tanago/src/features/auth/presentation/auth_controller.dart';
 import 'package:tanago/src/features/household/data/in_memory_household_repository.dart';
@@ -15,6 +17,8 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          categoryRepositoryProvider
+              .overrideWithValue(InMemoryCategoryRepository()),
           authRepositoryProvider.overrideWithValue(InMemoryAuthRepository()),
           householdRepositoryProvider
               .overrideWithValue(InMemoryHouseholdRepository()),
@@ -40,7 +44,11 @@ void main() {
     await tester.pumpAndSettle();
 
     final inviteField = find.widgetWithText(TextField, '招待コード');
-    await tester.ensureVisible(inviteField);
+    await tester.scrollUntilVisible(
+      inviteField,
+      180,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.tap(inviteField);
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
@@ -51,6 +59,12 @@ void main() {
     FocusManager.instance.primaryFocus?.unfocus();
     await tester.pumpAndSettle();
 
+    await tester.scrollUntilVisible(
+      find.widgetWithText(TextField, 'あなたの名前'),
+      -180,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.enterText(find.widgetWithText(TextField, 'あなたの名前'), 'ゆう');
     await tester.ensureVisible(find.text('この名前で始める'));
     await tester.tap(find.text('この名前で始める'));
     await tester.pumpAndSettle();
@@ -64,7 +78,7 @@ void main() {
     expect(find.text('家族を招待'), findsOneWidget);
     await tester.pageBack();
     await tester.pumpAndSettle();
-    expect(find.text('買ってきてほしいもの'), findsOneWidget);
+    expect(find.text('買いたいもの'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

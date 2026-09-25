@@ -11,5 +11,6 @@ abstract interface class ShoppingListRepository {
     String itemId,
     ShoppingItem Function(ShoppingItem current) update,
   );
+  Future<void> removeItems(String householdId, Set<String> itemIds);
   Future<void> removeItem(String householdId, String itemId);
 }

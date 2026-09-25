@@ -7,7 +7,8 @@ import '../../stores/presentation/store_controller.dart';
 import 'draggable_map_object.dart';
 import 'map_viewport.dart';
 
-import '../../product_categories/domain/product_categories.dart';
+import '../../product_categories/presentation/category_controller.dart';
+import '../../product_categories/presentation/category_dialog.dart';
 import '../domain/map_object.dart';
 import '../domain/store_map_key.dart';
 import 'map_editor_controller.dart';
@@ -333,6 +334,9 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
       builder: (context) {
         return Consumer(
           builder: (context, ref, child) {
+            final categoriesAsync =
+                ref.watch(categoriesProvider(mapKey.householdId));
+            final categories = categoriesAsync.valueOrNull ?? [];
             final object = ref
                 .watch(mapEditorProvider(mapKey))
                 .valueOrNull
@@ -386,11 +390,26 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
                         style: Theme.of(context).textTheme.titleSmall,
                       ),
                       const SizedBox(height: 8),
+                      if (categoriesAsync.hasError)
+                        TextButton(
+                          onPressed: () => ref.invalidate(
+                            categoriesProvider(mapKey.householdId),
+                          ),
+                          child: const Text('カテゴリを再読み込み'),
+                        ),
+                      if (categoriesAsync.isLoading)
+                        const LinearProgressIndicator(),
+                      TextButton.icon(
+                        onPressed: () =>
+                            showCategoryDialog(context, mapKey.householdId),
+                        icon: const Icon(Icons.add),
+                        label: const Text('カテゴリを作成'),
+                      ),
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
                         children: [
-                          for (final category in productCategories)
+                          for (final category in categories)
                             FilterChip(
                               label: Text(category.name),
                               selected:
@@ -404,12 +423,18 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
                                 } else {
                                   categoryIds.remove(category.id);
                                 }
-                                ref
-                                    .read(mapEditorControllerProvider(mapKey))
-                                    .updateDetails(
-                                      id: object.id,
-                                      categoryIds: categoryIds.toList(),
-                                    );
+                                if (categoryIds.length > 50) {
+                                  _showSaveError('1つの棚には50カテゴリまで設定できます。');
+                                  return;
+                                }
+                                _save(
+                                  ref
+                                      .read(mapEditorControllerProvider(mapKey))
+                                      .updateDetails(
+                                        id: object.id,
+                                        categoryIds: categoryIds.toList(),
+                                      ),
+                                );
                               },
                             ),
                         ],

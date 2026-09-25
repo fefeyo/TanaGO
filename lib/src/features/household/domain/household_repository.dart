@@ -16,5 +16,7 @@ abstract interface class HouseholdRepository {
     required String displayName,
   });
 
+  Future<void> updateMemberName(String householdId, String uid, String name);
+
   Future<String> getInviteCode(String householdId);
 }

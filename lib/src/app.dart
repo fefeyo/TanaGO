@@ -10,6 +10,9 @@ import 'features/map_editor/presentation/map_editor_page.dart';
 import 'features/shopping_list/presentation/shopping_list_page.dart';
 import 'features/shopping_map/presentation/shopping_map_page.dart';
 import 'features/stores/presentation/store_list_page.dart';
+import 'features/product_categories/presentation/categories_page.dart';
+import 'features/shopping_trip/presentation/shopping_selection_page.dart';
+import 'features/shopping_trip/presentation/shopping_completion_page.dart';
 
 final _routerProvider = Provider.autoDispose<GoRouter>((ref) {
   final router = GoRouter(
@@ -29,7 +32,25 @@ final _routerProvider = Provider.autoDispose<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/stores',
-            builder: (context, state) => const StoreListPage(),
+            builder: (context, state) => StoreListPage(
+              shopping: state.uri.queryParameters['shopping'] == 'true',
+            ),
+          ),
+          GoRoute(
+            path: '/categories',
+            builder: (context, state) => const CategoriesPage(),
+          ),
+          GoRoute(
+            path: '/stores/:storeId/select',
+            builder: (context, state) => ShoppingSelectionPage(
+              storeId: state.pathParameters['storeId']!,
+            ),
+          ),
+          GoRoute(
+            path: '/stores/:storeId/complete',
+            builder: (context, state) => ShoppingCompletionPage(
+              storeId: state.pathParameters['storeId']!,
+            ),
           ),
           GoRoute(
             path: '/stores/:storeId/map',

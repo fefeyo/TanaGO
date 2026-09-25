@@ -192,3 +192,39 @@ test('members can expand maps to 100 by 100 without shrinking or reviving delete
   await assertSucceeds(updateDoc(owner, { deleting: true }));
   await assertFails(updateDoc(guest, { mapWidth: 100, mapHeight: 100, deleting: false }));
 });
+
+test('custom categories are household scoped and valid on items and shelves', async () => {
+  await create(); await join();
+  const client = db('owner'), guest = db('guest');
+  const id = 'custom_12345678-1234-4123-8123-123456789012';
+  const second = 'custom_12345678-1234-4123-8123-123456789013';
+  const path = 'households/home/categoryCatalog/active';
+  await assertFails(setDoc(doc(db('outsider'), path), { names: { [id]: '健康食品' }, lastEditedId: id }));
+  await assertSucceeds(setDoc(doc(client, path), { names: { [id]: '健康食品' }, lastEditedId: id }));
+  await assertSucceeds(getDoc(doc(guest, path)));
+  await assertFails(getDoc(doc(db('outsider'), path)));
+  // Two names cannot be changed together, and existing categories cannot vanish.
+  await assertFails(updateDoc(doc(guest, path), { names: { [id]: '変更', [second]: 'ペット' }, lastEditedId: second }));
+  await assertSucceeds(updateDoc(doc(guest, path), { names: { [id]: '健康食品', [second]: 'ペット' }, lastEditedId: second }));
+  await assertFails(updateDoc(doc(guest, path), { names: { [second]: 'ペット' }, lastEditedId: second }));
+  await assertFails(updateDoc(doc(guest, path), { names: { [id]: '', [second]: 'ペット' }, lastEditedId: id }));
+  await assertSucceeds(setDoc(doc(client, 'households/home/shoppingLists/active/items/custom'), { ...item(), categoryId: id }));
+  await assertFails(setDoc(doc(client, 'households/home/shoppingLists/active/items/invalid'), { ...item(), categoryId: 'unknown' }));
+  await assertSucceeds(setDoc(doc(client, 'households/home/stores/s'), store));
+  await assertSucceeds(setDoc(doc(guest, 'households/home/stores/s/mapObjects/custom'), { ...shelf, categoryIds: [id, second, 'dairy'] }));
+  await assertFails(setDoc(doc(guest, 'households/home/stores/s/mapObjects/invalid'), { ...shelf, categoryIds: [id, 'unknown'] }));
+  await assertFails(deleteDoc(doc(client, path)));
+  await assertSucceeds(create('other', 'other', otherCode));
+  await assertFails(setDoc(doc(db('other'), 'households/other/shoppingLists/active/items/cross'), { ...item('other'), categoryId: id }));
+});
+
+test('members can rename only themselves without changing roles or membership', async () => {
+  await create(); await join();
+  await assertSucceeds(updateDoc(doc(db('guest'), 'households/home/members/guest'), { displayName: 'あき' }));
+  await assertFails(updateDoc(doc(db('guest'), 'households/home/members/owner'), { displayName: '偽名' }));
+  await assertFails(updateDoc(doc(db('owner'), 'households/home/members/guest'), { displayName: '上書き' }));
+  await assertFails(updateDoc(doc(db('guest'), 'households/home/members/guest'), { displayName: 'あき', role: 'owner' }));
+  await assertFails(updateDoc(doc(db('guest'), 'households/home/members/guest'), { displayName: '' }));
+  await assertSucceeds(setDoc(doc(db('owner'), 'households/home/shoppingLists/active/items/i'), item()));
+  await assertSucceeds(deleteDoc(doc(db('guest'), 'households/home/shoppingLists/active/items/i')));
+});

@@ -1,41 +1,39 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
+import '../../household/domain/household.dart';
 import '../../household/presentation/household_controller.dart';
-import '../../product_categories/domain/product_categories.dart';
-import '../../product_categories/domain/product_category_classifier.dart';
-import '../domain/shopping_item.dart';
+import '../../product_categories/presentation/category_controller.dart';
+import 'shopping_item_dialog.dart';
 import 'shopping_list_controller.dart';
 
-class ShoppingListPage extends ConsumerStatefulWidget {
+class ShoppingListPage extends ConsumerWidget {
   const ShoppingListPage({super.key});
-
   @override
-  ConsumerState<ShoppingListPage> createState() => _ShoppingListPageState();
-}
-
-class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
-  static const _categoryClassifier = ProductCategoryClassifier();
-
-  final _controller = TextEditingController();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final household = ref.watch(householdProvider).valueOrNull!;
-    final itemsAsync = ref.watch(shoppingListProvider(household.id));
-    final items = itemsAsync.valueOrNull ?? const <ShoppingItem>[];
-
+  Widget build(BuildContext context, WidgetRef ref) {
+    final household = ref.watch(householdProvider).requireValue!;
+    final asyncItems = ref.watch(shoppingListProvider(household.id));
+    final members =
+        ref.watch(householdMembersProvider(household.id)).valueOrNull ??
+            <HouseholdMember>[];
+    final categories =
+        ref.watch(categoriesProvider(household.id)).valueOrNull ?? [];
+    final items =
+        asyncItems.valueOrNull?.where((i) => !i.isPurchased).toList() ?? [];
     return Scaffold(
       appBar: AppBar(
-        title: const Text('TanaGO'),
+        title: const Text('買いたいもの'),
         actions: [
+          IconButton(
+            tooltip: 'カテゴリ',
+            onPressed: () => context.push('/categories'),
+            icon: const Icon(Icons.category_outlined),
+          ),
+          IconButton(
+            tooltip: '店舗を管理',
+            onPressed: () => context.push('/stores'),
+            icon: const Icon(Icons.storefront_outlined),
+          ),
           IconButton(
             tooltip: 'わが家',
             onPressed: () => context.push('/household'),
@@ -46,46 +44,46 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
           preferredSize: const Size.fromHeight(32),
           child: Padding(
             padding: const EdgeInsets.only(bottom: 8),
-            child: Text(
-              household.name,
-              style: Theme.of(context).textTheme.labelLarge,
-            ),
+            child: Text(household.name),
           ),
         ),
       ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              Row(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
                 children: [
                   Expanded(
-                    child: TextField(
-                      controller: _controller,
-                      decoration: InputDecoration(
-                        labelText: '買ってきてほしいもの',
-                        hintText: '例: 牛乳',
-                        helperText: _categoryHelperText(),
-                        border: const OutlineInputBorder(),
-                      ),
-                      onChanged: (_) => setState(() {}),
-                      onSubmitted: (_) => _addItem(),
+                    child: Text(
+                      '${items.length}点の買いたいもの',
+                      style: Theme.of(context).textTheme.titleMedium,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  IconButton.filled(
-                    onPressed: _addItem,
+                  FilledButton.icon(
+                    onPressed: () =>
+                        showShoppingItemDialog(context, household.id),
                     icon: const Icon(Icons.add),
+                    label: const Text('登録'),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              Expanded(
-                child: items.isEmpty
+            ),
+            Expanded(
+              child: asyncItems.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (_, __) => Center(
+                  child: TextButton(
+                    onPressed: () =>
+                        ref.invalidate(shoppingListProvider(household.id)),
+                    child: const Text('リストを再読み込み'),
+                  ),
+                ),
+                data: (_) => items.isEmpty
                     ? const Center(
                         child: Text(
-                          '買ってきてほしいものを追加すると\n同じ家のメンバーと共有できます',
+                          '買いたいものを登録して\n家族と共有しましょう',
                           textAlign: TextAlign.center,
                         ),
                       )
@@ -93,140 +91,90 @@ class _ShoppingListPageState extends ConsumerState<ShoppingListPage> {
                         itemCount: items.length,
                         itemBuilder: (context, index) {
                           final item = items[index];
-                          return Dismissible(
+                          return ListTile(
                             key: ValueKey(item.id),
-                            onDismissed: (_) => ref
-                                .read(
-                                  shoppingListControllerProvider(
-                                    ref.read(householdProvider).valueOrNull!.id,
-                                  ),
-                                )
-                                .remove(item.id),
-                            child: CheckboxListTile(
-                              value: item.isPurchased,
-                              title: Text(item.name),
-                              subtitle: Text(
-                                _itemSubtitle(
-                                  item.isPurchased,
-                                  item.categoryId,
-                                ),
-                              ),
-                              secondary: IconButton(
-                                tooltip: 'カテゴリを設定',
-                                onPressed: () => _showCategoryPicker(
-                                  item.id,
-                                  item.categoryId,
-                                ),
-                                icon: Icon(
-                                  item.categoryId == null
-                                      ? Icons.category_outlined
-                                      : Icons.category,
-                                ),
-                              ),
-                              onChanged: (_) => ref
-                                  .read(
-                                    shoppingListControllerProvider(
-                                      ref
-                                          .read(householdProvider)
-                                          .valueOrNull!
-                                          .id,
+                            title: Text(item.name),
+                            subtitle: Text(
+                              '${categoryName(categories, item.categoryId)} ・ ${memberName(members, item.addedByUid)}が登録',
+                            ),
+                            onTap: () => showShoppingItemDialog(
+                              context,
+                              household.id,
+                              item: item,
+                            ),
+                            trailing: IconButton(
+                              tooltip: '削除',
+                              icon: const Icon(Icons.delete_outline),
+                              onPressed: () async {
+                                final remove = await showDialog<bool>(
+                                  context: context,
+                                  builder: (c) => AlertDialog(
+                                    title: Text(
+                                      '${item.name}を削除しますか？',
                                     ),
-                                  )
-                                  .togglePurchased(item.id),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(
+                                          c,
+                                          false,
+                                        ),
+                                        child: const Text(
+                                          'キャンセル',
+                                        ),
+                                      ),
+                                      FilledButton(
+                                        onPressed: () => Navigator.pop(
+                                          c,
+                                          true,
+                                        ),
+                                        child: const Text('削除'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (remove != true || !context.mounted) {
+                                  return;
+                                }
+                                try {
+                                  await ref
+                                      .read(
+                                        shoppingListControllerProvider(
+                                          household.id,
+                                        ),
+                                      )
+                                      .remove(item.id);
+                                } catch (_) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('削除できませんでした'),
+                                      ),
+                                    );
+                                  }
+                                }
+                              },
                             ),
                           );
                         },
                       ),
               ),
-              SizedBox(
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
-                  onPressed:
-                      items.isEmpty ? null : () => context.push('/stores'),
-                  icon: const Icon(Icons.storefront),
+                  onPressed: items.isEmpty
+                      ? null
+                      : () => context.push('/stores?shopping=true'),
+                  icon: const Icon(Icons.shopping_basket_outlined),
                   label: const Text('買い物に行く'),
                 ),
               ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  String? _categoryHelperText() {
-    final categoryId = _categoryClassifier.classify(_controller.text);
-    if (categoryId == null) {
-      return null;
-    }
-
-    final category = productCategoryById(categoryId);
-    return category == null ? null : '自動判定: ${category.name}';
-  }
-
-  String _itemSubtitle(bool isPurchased, String? categoryId) {
-    final category = productCategoryById(categoryId);
-    final status = isPurchased ? '購入済み' : 'あなたが追加';
-    if (category == null) {
-      return '$status ・ カテゴリ未設定';
-    }
-    return '$status ・ ${category.name}';
-  }
-
-  Future<void> _showCategoryPicker(
-    String itemId,
-    String? selectedCategoryId,
-  ) async {
-    final categoryId = await showModalBottomSheet<String>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: ListView(
-          shrinkWrap: true,
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-          children: [
-            Text(
-              '商品カテゴリ',
-              style: Theme.of(context).textTheme.titleLarge,
             ),
-            const SizedBox(height: 8),
-            const Text('このカテゴリを使って、店舗内の売り場を表示します。'),
-            const SizedBox(height: 12),
-            for (final category in productCategories)
-              ListTile(
-                leading: Icon(
-                  category.id == selectedCategoryId
-                      ? Icons.check_circle
-                      : Icons.circle_outlined,
-                ),
-                title: Text(category.name),
-                onTap: () => Navigator.of(context).pop(category.id),
-              ),
           ],
         ),
       ),
     );
-
-    if (categoryId != null) {
-      ref
-          .read(
-            shoppingListControllerProvider(
-              ref.read(householdProvider).valueOrNull!.id,
-            ),
-          )
-          .updateCategory(itemId, categoryId);
-    }
-  }
-
-  void _addItem() {
-    ref
-        .read(
-          shoppingListControllerProvider(
-            ref.read(householdProvider).valueOrNull!.id,
-          ),
-        )
-        .add(_controller.text);
-    _controller.clear();
-    setState(() {});
   }
 }

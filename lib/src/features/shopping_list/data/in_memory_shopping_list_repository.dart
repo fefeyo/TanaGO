@@ -40,6 +40,13 @@ class InMemoryShoppingListRepository implements ShoppingListRepository {
   }
 
   @override
+  Future<void> removeItems(String householdId, Set<String> itemIds) async {
+    for (final id in itemIds) {
+      await removeItem(householdId, id);
+    }
+  }
+
+  @override
   Future<void> removeItem(String householdId, String itemId) async {
     _items[householdId] = [
       for (final item in _items[householdId] ?? const <ShoppingItem>[])

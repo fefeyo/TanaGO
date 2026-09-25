@@ -12,6 +12,7 @@ class HouseholdSetupPage extends ConsumerStatefulWidget {
 
 class _HouseholdSetupPageState extends ConsumerState<HouseholdSetupPage> {
   final _nameController = TextEditingController(text: 'わが家');
+  final _displayNameController = TextEditingController();
   final _inviteController = TextEditingController();
   bool _isSubmitting = false;
 
@@ -19,6 +20,7 @@ class _HouseholdSetupPageState extends ConsumerState<HouseholdSetupPage> {
   void dispose() {
     _nameController.dispose();
     _inviteController.dispose();
+    _displayNameController.dispose();
     super.dispose();
   }
 
@@ -47,6 +49,17 @@ class _HouseholdSetupPageState extends ConsumerState<HouseholdSetupPage> {
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 48),
+            TextField(
+              controller: _displayNameController,
+              enabled: !_isSubmitting,
+              maxLength: 100,
+              decoration: const InputDecoration(
+                labelText: 'あなたの名前',
+                hintText: '例：ゆう',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 24),
             Text('新しい家を作る', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 12),
             TextField(
@@ -104,18 +117,29 @@ class _HouseholdSetupPageState extends ConsumerState<HouseholdSetupPage> {
 
   Future<void> _createHousehold() async {
     await _submit(
-      () => ref.read(householdControllerProvider).create(_nameController.text),
+      () => ref.read(householdControllerProvider).create(
+            _nameController.text,
+            displayName: _displayNameController.text,
+          ),
     );
   }
 
   Future<void> _joinHousehold() async {
     await _submit(
-      () => ref.read(householdControllerProvider).join(_inviteController.text),
+      () => ref.read(householdControllerProvider).join(
+            _inviteController.text,
+            displayName: _displayNameController.text,
+          ),
     );
   }
 
   Future<void> _submit(Future<void> Function() action) async {
     if (_isSubmitting) return;
+    if (_displayNameController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('あなたの名前を入力してください')));
+      return;
+    }
     setState(() => _isSubmitting = true);
     try {
       await action();
