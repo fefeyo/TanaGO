@@ -119,6 +119,98 @@ class FailingCompletionRepository extends InMemoryShoppingListRepository {
 
 void main() {
   testWidgets(
+      'purchase confirmation can uncheck and recheck without losing rows',
+      (tester) async {
+    final f = FlowFixture();
+    await f.mount(tester);
+    final container =
+        ProviderScope.containerOf(tester.element(find.byType(TanaGoApp)));
+    final key = StoreMapKey(householdId: f.hid, storeId: 's');
+    final trip = container.read(shoppingTripProvider(key).notifier);
+    trip.select('milk', true);
+    trip.select('egg', true);
+    trip.check('milk', true);
+    trip.check('egg', true);
+    GoRouter.of(tester.element(find.byType(Scaffold))).go('/stores/s/complete');
+    await tester.pumpAndSettle();
+    final milk = find.byKey(const ValueKey('confirm-milk'));
+    final egg = find.byKey(const ValueKey('confirm-egg'));
+    await tester.tap(milk);
+    await tester.pumpAndSettle();
+    expect(tester.widget<CheckboxListTile>(milk).value, isFalse);
+    expect(find.text('チェックした1点を購入済みにします'), findsOneWidget);
+    await tester.tap(egg);
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<FilledButton>(find.widgetWithText(FilledButton, '購入を確定する'))
+          .onPressed,
+      isNull,
+    );
+    await tester.tap(milk);
+    await tester.pumpAndSettle();
+    expect(tester.widget<CheckboxListTile>(milk).value, isTrue);
+    await tester.tap(milk);
+    await tester.tap(egg);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('購入を確定する'));
+    await tester.pumpAndSettle();
+    expect(
+      (await f.items.getItems(f.hid)).map((i) => i.id).toSet(),
+      {'milk', 'fish'},
+    );
+    expect(find.byType(CheckboxListTile), findsNothing);
+    expect(find.text('1点の購入が完了しました'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'map highlights registered items while browsing and unchecked selected items while shopping',
+      (tester) async {
+    final f = FlowFixture();
+    await f.mount(tester);
+    final key = StoreMapKey(householdId: f.hid, storeId: 's');
+    await f.maps.saveObject(
+      key,
+      const MapObject(
+        id: 'empty-shelf',
+        type: MapObjectType.shelf,
+        x: 5,
+        y: 1,
+        width: 3,
+        height: 1,
+        categoryIds: ['snacks'],
+      ),
+    );
+    final container =
+        ProviderScope.containerOf(tester.element(find.byType(TanaGoApp)));
+    GoRouter.of(tester.element(find.byType(Scaffold))).go('/stores/s/map');
+    await tester.pumpAndSettle();
+    Color? shelfColor(String id) => (tester
+            .widget<AnimatedContainer>(
+              find.byKey(ValueKey('shopping-shelf-$id')),
+            )
+            .decoration! as BoxDecoration)
+        .color;
+    final highlighted = shelfColor('shelf');
+    final neutral = shelfColor('empty-shelf');
+    expect(highlighted, isNot(neutral));
+    final trip = container.read(shoppingTripProvider(key).notifier);
+    trip.select('milk', true);
+    await tester.pumpAndSettle();
+    expect(shelfColor('shelf'), highlighted);
+    trip.check('milk', true);
+    await tester.pumpAndSettle();
+    expect(shelfColor('shelf'), neutral);
+    trip.check('milk', false);
+    await tester.pumpAndSettle();
+    expect(shelfColor('shelf'), highlighted);
+    expect(find.byTooltip('拡大'), findsNothing);
+    expect(find.byTooltip('縮小'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
       'priority persists through create and edit, and warning opens category assignment',
       (tester) async {
     final f = FlowFixture();
@@ -127,10 +219,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(find.widgetWithText(TextFormField, '商品名'), '必要なもの');
     await tester
-        .ensureVisible(find.byType(DropdownButtonFormField<ShoppingPriority>));
-    await tester.tap(find.byType(DropdownButtonFormField<ShoppingPriority>));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('高').last);
+        .ensureVisible(find.widgetWithText(CheckboxListTile, 'すぐ買いたい！'));
+    await tester.tap(find.widgetWithText(CheckboxListTile, 'すぐ買いたい！'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
@@ -146,22 +236,27 @@ void main() {
     await tester.tap(find.text('カテゴリを設定'));
     await tester.pumpAndSettle();
     expect(find.text('買いたいものを編集'), findsOneWidget);
-    expect(find.text('高'), findsOneWidget);
+    expect(
+      tester
+          .widget<CheckboxListTile>(
+            find.widgetWithText(CheckboxListTile, 'すぐ買いたい！'),
+          )
+          .value,
+      isTrue,
+    );
     await tester.tap(find.byType(DropdownButtonFormField<String>));
     await tester.pumpAndSettle();
     await tester.tap(find.text('野菜・果物').last);
     await tester.pumpAndSettle();
     await tester
-        .ensureVisible(find.byType(DropdownButtonFormField<ShoppingPriority>));
-    await tester.tap(find.byType(DropdownButtonFormField<ShoppingPriority>));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('低').last);
+        .ensureVisible(find.widgetWithText(CheckboxListTile, 'すぐ買いたい！'));
+    await tester.tap(find.widgetWithText(CheckboxListTile, 'すぐ買いたい！'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
     added =
         (await f.items.getItems(f.hid)).singleWhere((i) => i.id == added.id);
-    expect(added.priority, ShoppingPriority.low);
+    expect(added.buySoon, isFalse);
     expect(added.categoryId, 'produce');
     expect(find.text('カテゴリを設定'), findsNothing);
     expect(tester.takeException(), isNull);
@@ -255,7 +350,7 @@ void main() {
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
     expect(find.text('名前を設定'), findsNothing);
-    expect(find.text('たろうが登録'), findsOneWidget);
+    expect(find.textContaining('が登録'), findsNothing);
     await tester.tap(find.byTooltip('わが家'));
     await tester.pumpAndSettle();
     expect(find.text('自分の名前を変更'), findsOneWidget);
@@ -342,7 +437,7 @@ void main() {
     final f = FlowFixture();
     await f.mount(tester);
     expect(find.byType(Checkbox), findsNothing);
-    expect(find.textContaining('あきが登録'), findsNWidgets(2));
+    expect(find.textContaining('が登録'), findsNothing);
     await tester.tap(find.text('買い物に行く'));
     await tester.pumpAndSettle();
     expect(find.text('買い物する店舗を選ぶ'), findsOneWidget);
@@ -368,7 +463,12 @@ void main() {
     await tester.tap(find.text('チェックした1点の購入を完了する'));
     await tester.pumpAndSettle();
     expect(find.text('購入内容の確認'), findsOneWidget);
-    expect(find.text('卵'), findsNothing);
+    expect(
+      tester
+          .widget<CheckboxListTile>(find.byKey(const ValueKey('confirm-egg')))
+          .value,
+      isFalse,
+    );
     expect((await f.items.getItems(f.hid)).length, 3);
     await tester.tap(find.text('購入を確定する'));
     await tester.pumpAndSettle();
@@ -407,7 +507,7 @@ void main() {
     final customId = added.categoryId;
     expect(customId, startsWith('custom_'));
     expect(find.text('健康食品'), findsOneWidget);
-    expect(find.text('ゆうが登録'), findsWidgets);
+    expect(find.textContaining('が登録'), findsNothing);
     await tester.tap(find.byTooltip('店舗を管理'));
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('店内マップを編集'));

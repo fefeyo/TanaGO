@@ -130,20 +130,17 @@ class _ShoppingItemDialogState extends ConsumerState<_ShoppingItemDialog> {
                         ),
               ),
               const SizedBox(height: 16),
-              DropdownButtonFormField<ShoppingPriority>(
-                initialValue: _priority,
-                decoration: const InputDecoration(labelText: '優先度'),
-                items: [
-                  for (final priority in ShoppingPriority.values)
-                    DropdownMenuItem(
-                      value: priority,
-                      child: Text(priority.label),
-                    ),
-                ],
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('すぐ買いたい！'),
+                controlAffinity: ListTileControlAffinity.leading,
+                value: _priority == ShoppingPriority.high,
                 onChanged: _saving
                     ? null
                     : (value) => setState(
-                          () => _priority = value ?? ShoppingPriority.normal,
+                          () => _priority = value == true
+                              ? ShoppingPriority.high
+                              : ShoppingPriority.normal,
                         ),
               ),
               if (suggestion != null &&

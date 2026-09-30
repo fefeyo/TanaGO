@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../../../design/app_components.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../household/domain/household.dart';
 import '../../household/presentation/my_name_card.dart';
 import '../../household/presentation/household_controller.dart';
 import '../../product_categories/presentation/category_controller.dart';
@@ -16,9 +15,6 @@ class ShoppingListPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final household = ref.watch(householdProvider).requireValue!;
     final asyncItems = ref.watch(shoppingListProvider(household.id));
-    final members =
-        ref.watch(householdMembersProvider(household.id)).valueOrNull ??
-            <HouseholdMember>[];
     final asyncCategories = ref.watch(categoriesProvider(household.id));
     final categories = asyncCategories.valueOrNull ?? [];
     final items =
@@ -96,7 +92,6 @@ class ShoppingListPage extends ConsumerWidget {
                         : CategoryShoppingList(
                             items: items,
                             categories: categories,
-                            members: members,
                             onEdit: (item) => showShoppingItemDialog(
                               context,
                               household.id,

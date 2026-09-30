@@ -35,7 +35,7 @@ class MyNameCard extends ConsumerWidget {
             if (missing)
               const Padding(
                 padding: EdgeInsets.only(top: 4),
-                child: Text('買いたいものの登録者名にも使います。'),
+                child: Text('家族がわかる名前を設定できます。'),
               ),
             Align(
               alignment: Alignment.centerRight,

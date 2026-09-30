@@ -158,6 +158,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
     expect(find.text('12 × 16 マス'), findsOneWidget);
+    expect(find.text('移動・拡大'), findsNothing);
+    expect(find.byTooltip('拡大'), findsNothing);
+    expect(find.byTooltip('縮小'), findsNothing);
     await tester.tap(find.byTooltip('マス目を増やす'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextFormField).at(0), '24');
@@ -168,13 +171,9 @@ void main() {
     expect(find.text('24 × 32 マス'), findsOneWidget);
     expect((await stores.getStores('h')).single.mapWidth, 24);
 
-    await tester.tap(find.text('移動・拡大'));
-    await tester.pumpAndSettle();
     final viewport =
         tester.widget<InteractiveViewer>(find.byType(InteractiveViewer));
     final center = tester.getCenter(find.byKey(const ValueKey('map-viewport')));
-    await tester.tapAt(center);
-    await tester.pumpAndSettle();
     expect(await maps.getObjects(key), isEmpty);
     await tester.dragFrom(center, const Offset(-200, -200));
     await tester.pumpAndSettle();
@@ -185,8 +184,6 @@ void main() {
     await tester.pumpAndSettle();
     final transform = viewport.transformationController!;
     expect(transform.value.getMaxScaleOnAxis(), lessThan(1));
-    await tester.tap(find.text('移動・拡大'));
-    await tester.pumpAndSettle();
     final scenePoint =
         const Offset(20.5 * MapViewport.cellSize, 25.5 * MapViewport.cellSize);
     final screenPoint =

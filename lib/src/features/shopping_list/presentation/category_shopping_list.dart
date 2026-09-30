@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../household/domain/household.dart';
 import '../../product_categories/domain/product_category.dart';
 import '../domain/shopping_item.dart';
 
@@ -10,13 +9,11 @@ class CategoryShoppingList extends StatelessWidget {
     super.key,
     required this.items,
     required this.categories,
-    required this.members,
     required this.onEdit,
     required this.onDelete,
   });
   final List<ShoppingItem> items;
   final List<ProductCategory> categories;
-  final List<HouseholdMember> members;
   final ValueChanged<ShoppingItem> onEdit;
   final ValueChanged<ShoppingItem> onDelete;
 
@@ -35,7 +32,7 @@ class CategoryShoppingList extends StatelessWidget {
     ];
     for (final group in groups.values) {
       group.sort((a, b) {
-        final priority = a.priority.index.compareTo(b.priority.index);
+        final priority = (a.buySoon ? 0 : 1).compareTo(b.buySoon ? 0 : 1);
         if (priority != 0) return priority;
         final created = a.createdAt.compareTo(b.createdAt);
         return created != 0 ? created : a.id.compareTo(b.id);
@@ -67,7 +64,6 @@ class CategoryShoppingList extends StatelessWidget {
                     return _CompactItem(
                       key: ValueKey(item.id),
                       item: item,
-                      member: memberName(members, item.addedByUid),
                       unclassified: id == null,
                       onEdit: () => onEdit(item),
                       onDelete: () => onDelete(item),
@@ -149,93 +145,68 @@ class _CompactItem extends StatelessWidget {
   const _CompactItem({
     super.key,
     required this.item,
-    required this.member,
     required this.unclassified,
     required this.onEdit,
     required this.onDelete,
   });
   final ShoppingItem item;
-  final String member;
   final bool unclassified;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   @override
   Widget build(BuildContext context) => Material(
-        color: unclassified ? const Color(0xFFFFF5DF) : Colors.white,
+        color: item.buySoon
+            ? const Color(0xFFFFE4D8)
+            : unclassified
+                ? const Color(0xFFFFF5DF)
+                : Colors.white,
         child: InkWell(
           onTap: onEdit,
           child: Container(
-            decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: Color(0xFFE6EAE3))),
+            decoration: BoxDecoration(
+              border: Border(
+                left: BorderSide(
+                  color: item.buySoon
+                      ? const Color(0xFFB24B32)
+                      : Colors.transparent,
+                  width: 3,
+                ),
+                bottom: const BorderSide(color: Color(0xFFE6EAE3)),
+              ),
             ),
-            padding: const EdgeInsets.only(left: 12, top: 6, bottom: 6),
+            padding: const EdgeInsets.only(left: 9, top: 4, bottom: 4),
             child: Row(
               children: [
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              item.name,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.titleSmall,
+                      Text(
+                        item.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      if (item.buySoon)
+                        const Text(
+                          'すぐ買いたい！',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF9B3C28),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      if (unclassified)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 2),
+                          child: Text(
+                            'カテゴリを設定',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF8A5800),
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                          if (item.priority != ShoppingPriority.normal) ...[
-                            const SizedBox(width: 6),
-                            Semantics(
-                              label: '優先度：${item.priority.label}',
-                              child: Text(
-                                '優先度 ${item.priority.label}',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: item.priority == ShoppingPriority.high
-                                      ? const Color(0xFFA44132)
-                                      : const Color(0xFF61716B),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      if (unclassified)
-                        const Row(
-                          children: [
-                            Icon(
-                              Icons.warning_amber_rounded,
-                              size: 16,
-                              color: Color(0xFF8A5800),
-                            ),
-                            SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                'カテゴリを設定',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Color(0xFF8A5800),
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                            Icon(
-                              Icons.chevron_right,
-                              size: 16,
-                              color: Color(0xFF8A5800),
-                            ),
-                          ],
-                        )
-                      else
-                        Text(
-                          '$memberが登録',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodySmall,
                         ),
                     ],
                   ),

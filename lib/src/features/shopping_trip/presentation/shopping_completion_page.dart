@@ -32,7 +32,10 @@ class _ShoppingCompletionPageState
           (i) => trip.selected.contains(i.id) && trip.checked.contains(i.id),
         )
         .toList();
-    final shown = _completed ?? checked;
+    final shown = _completed ??
+        (asyncItems.valueOrNull ?? [])
+            .where((i) => trip.selected.contains(i.id))
+            .toList();
     return PopScope(
       canPop: !_saving,
       child: Scaffold(
@@ -51,7 +54,7 @@ class _ShoppingCompletionPageState
                       ? 'チェックした${checked.length}点を購入済みにします'
                       : '${shown.length}点の購入が完了しました',
                   description: _completed == null
-                      ? '確定すると登録一覧から消えます。未チェックの商品は残ります。'
+                      ? '買っていないものはチェックを外してください。チェックした商品だけ登録一覧から消えます。'
                       : '購入した商品を登録一覧から削除しました。',
                 ),
               ),
@@ -65,14 +68,30 @@ class _ShoppingCompletionPageState
                   children: [
                     for (final item in shown)
                       Card(
-                        child: ListTile(
-                          title: Text(item.name),
-                          leading: CategorySymbol(categoryId: item.categoryId),
-                          trailing: const Icon(
-                            Icons.check_circle,
-                            color: Color(0xFF246653),
-                          ),
-                        ),
+                        child: _completed == null
+                            ? CheckboxListTile(
+                                key: ValueKey('confirm-${item.id}'),
+                                title: Text(item.name),
+                                secondary:
+                                    CategorySymbol(categoryId: item.categoryId),
+                                value: trip.checked.contains(item.id),
+                                onChanged: _saving || !asyncItems.hasValue
+                                    ? null
+                                    : (value) => ref
+                                        .read(
+                                          shoppingTripProvider(key).notifier,
+                                        )
+                                        .check(item.id, value ?? false),
+                              )
+                            : ListTile(
+                                title: Text(item.name),
+                                leading:
+                                    CategorySymbol(categoryId: item.categoryId),
+                                trailing: const Icon(
+                                  Icons.check_circle,
+                                  color: Color(0xFF246653),
+                                ),
+                              ),
                       ),
                   ],
                 ),

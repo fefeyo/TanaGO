@@ -56,17 +56,23 @@ class _ShoppingMapPageState extends ConsumerState<ShoppingMapPage> {
 
     final highlightedShelfIds = requiredShelfIds(
       objects: objects,
-      shoppingItems: pendingItems,
+      shoppingItems: shoppingItems.isEmpty
+          ? shoppingItemsAsync.valueOrNull ?? const <ShoppingItem>[]
+          : pendingItems,
     );
 
     final selectedShelf =
         objects.where((object) => object.id == _selectedShelfId).firstOrNull;
 
+    final browsing = shoppingItems.isEmpty;
+    final displayedItems = browsing
+        ? shoppingItemsAsync.valueOrNull ?? const <ShoppingItem>[]
+        : shoppingItems;
     final selectedItems = selectedShelf == null
-        ? shoppingItems
+        ? displayedItems
         : itemsForShelf(
             shelf: selectedShelf,
-            shoppingItems: shoppingItems,
+            shoppingItems: displayedItems,
           );
 
     return Scaffold(
@@ -100,8 +106,9 @@ class _ShoppingMapPageState extends ConsumerState<ShoppingMapPage> {
                       ),
                       _SummaryChip(
                         icon: Icons.shopping_basket_outlined,
-                        label:
-                            'チェック ${shoppingItems.length - pendingItems.length}/${shoppingItems.length}',
+                        label: browsing
+                            ? '登録 ${displayedItems.length}点'
+                            : 'チェック ${shoppingItems.length - pendingItems.length}/${shoppingItems.length}',
                       ),
                       _SummaryChip(
                         icon: Icons.view_agenda_outlined,
@@ -129,8 +136,8 @@ class _ShoppingMapPageState extends ConsumerState<ShoppingMapPage> {
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
               child: Text(
                 shoppingItems.isEmpty
-                    ? '棚をタップしてカテゴリを確認 / ピンチで拡大'
-                    : '色付きの棚に買うものがあります / 棚をタップで詳細',
+                    ? '濃い緑の棚に買いたいものがあります / 棚をタップで詳細'
+                    : '濃い緑の棚に未チェックの商品があります / 棚をタップで詳細',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ),
@@ -205,6 +212,7 @@ class _ShoppingMapPageState extends ConsumerState<ShoppingMapPage> {
             ),
             _ShelfItemsPanel(
               shelf: selectedShelf,
+              browsing: browsing,
               categories: categories,
               items: selectedItems,
               checked: trip.checked,
@@ -294,14 +302,15 @@ class _ShoppingMapObject extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
+        key: ValueKey('shopping-shelf-${object.id}'),
         duration: const Duration(milliseconds: 180),
         margin: const EdgeInsets.all(2),
         decoration: BoxDecoration(
-          color: isRequired ? scheme.primaryContainer : baseColor,
+          color: isRequired ? scheme.primary : baseColor,
           borderRadius: BorderRadius.circular(7),
           border: Border.all(
             color: isSelected
-                ? scheme.primary
+                ? const Color(0xFFCE8900)
                 : isRequired
                     ? scheme.primary.withValues(alpha: 0.65)
                     : scheme.outlineVariant,
@@ -319,7 +328,10 @@ class _ShoppingMapObject extends StatelessWidget {
                 ]
               : null,
         ),
-        child: MapObjectContent(object: object, categories: categories),
+        child: DefaultTextStyle.merge(
+          style: TextStyle(color: isRequired ? Colors.white : scheme.onSurface),
+          child: MapObjectContent(object: object, categories: categories),
+        ),
       ),
     );
   }
@@ -328,6 +340,7 @@ class _ShoppingMapObject extends StatelessWidget {
 class _ShelfItemsPanel extends StatelessWidget {
   const _ShelfItemsPanel({
     required this.shelf,
+    required this.browsing,
     required this.categories,
     required this.items,
     required this.onTogglePurchased,
@@ -336,6 +349,7 @@ class _ShelfItemsPanel extends StatelessWidget {
   });
 
   final MapObject? shelf;
+  final bool browsing;
   final List<ProductCategory> categories;
   final List<ShoppingItem> items;
   final ValueChanged<String> onTogglePurchased;
@@ -345,7 +359,9 @@ class _ShelfItemsPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final title = shelf == null
-        ? '今回買うもの'
+        ? browsing
+            ? '買いたいもの'
+            : '今回買うもの'
         : shelf!.label?.isNotEmpty == true
             ? '${shelf!.label}で買うもの'
             : 'この棚の売り場';
@@ -414,14 +430,20 @@ class _ShelfItemsPanel extends StatelessWidget {
                 separatorBuilder: (_, __) => const Divider(height: 1),
                 itemBuilder: (context, index) {
                   final item = items[index];
+                  if (browsing) {
+                    return ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(item.name),
+                      subtitle: item.buySoon ? const Text('すぐ買いたい！') : null,
+                    );
+                  }
                   return CheckboxListTile(
                     contentPadding: EdgeInsets.zero,
                     dense: true,
                     value: checked.contains(item.id),
                     title: Text(item.name),
-                    subtitle: item.priority == ShoppingPriority.normal
-                        ? null
-                        : Text('優先度：${item.priority.label}'),
+                    subtitle: item.buySoon ? const Text('すぐ買いたい！') : null,
                     onChanged: (_) => onTogglePurchased(item.id),
                   );
                 },

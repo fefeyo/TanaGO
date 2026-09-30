@@ -35,7 +35,6 @@ void main() {
               item('急ぎの牛乳', 'dairy', priority: ShoppingPriority.high),
             ],
             categories: productCategories,
-            members: const [],
             onEdit: (value) => edited = value,
             onDelete: (_) {},
           ),
@@ -45,13 +44,18 @@ void main() {
     double y(String id) => tester.getTopLeft(find.byKey(ValueKey(id))).dy;
     expect(y('野菜'), lessThan(y('急ぎの牛乳')));
     expect(y('急ぎの牛乳'), lessThan(y('通常の牛乳')));
-    expect(y('通常の牛乳'), lessThan(y('低い卵')));
+    expect(y('急ぎの牛乳'), lessThan(y('低い卵')));
+    expect(y('通常の牛乳'), lessThan(y('未分類商品')));
     expect(y('低い卵'), lessThan(y('未分類商品')));
     expect(
       tester.getSize(find.byKey(const ValueKey('通常の牛乳'))).height,
       lessThanOrEqualTo(64),
     );
     expect(find.text('カテゴリを設定'), findsOneWidget);
+    expect(find.textContaining('が登録'), findsNothing);
+    expect(find.textContaining('優先度'), findsNothing);
+    expect(find.byIcon(Icons.chevron_right), findsNothing);
+    expect(find.text('すぐ買いたい！'), findsOneWidget);
     await tester.tap(find.text('カテゴリを設定'));
     expect(edited?.id, '未分類商品');
   });
@@ -69,7 +73,6 @@ void main() {
                 for (var i = 0; i < 12; i++) item('牛乳$i', 'dairy'),
               ],
               categories: productCategories,
-              members: const [],
               onEdit: (_) {},
               onDelete: (_) {},
             ),

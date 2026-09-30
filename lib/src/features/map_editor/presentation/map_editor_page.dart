@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../household/presentation/household_controller.dart';
@@ -24,7 +25,7 @@ class MapEditorPage extends ConsumerStatefulWidget {
 }
 
 class _MapEditorPageState extends ConsumerState<MapEditorPage> {
-  bool _navigate = false;
+  Offset? _backgroundPointer;
 
   MapObjectType _selectedType = MapObjectType.shelf;
   String? _selectedObjectId;
@@ -117,13 +118,6 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
               child: Row(
                 children: [
                   Text('${store.mapWidth} × ${store.mapHeight} マス'),
-                  const Spacer(),
-                  FilterChip(
-                    label: const Text('移動・拡大'),
-                    avatar: const Icon(Icons.pan_tool_outlined, size: 18),
-                    selected: _navigate,
-                    onSelected: (value) => setState(() => _navigate = value),
-                  ),
                 ],
               ),
             ),
@@ -131,32 +125,49 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
               child: MapViewport(
                 columns: store.mapWidth,
                 rows: store.mapHeight,
-                navigationEnabled: _navigate,
+                editing: true,
                 builder: (transform, pinchGuard) => Stack(
                   children: [
                     Positioned.fill(
                       child: RepaintBoundary(
                         child: GestureDetector(
                           key: const ValueKey('map-grid'),
+                          dragStartBehavior: DragStartBehavior.down,
                           behavior: HitTestBehavior.opaque,
-                          onTapUp: _navigate
-                              ? null
-                              : (details) {
-                                  if (pinchGuard.value) return;
-                                  _save(
-                                    controller.add(
-                                      type: _selectedType,
-                                      x: (details.localPosition.dx /
-                                              MapViewport.cellSize)
-                                          .floor(),
-                                      y: (details.localPosition.dy /
-                                              MapViewport.cellSize)
-                                          .floor(),
-                                      mapWidth: store.mapWidth,
-                                      mapHeight: store.mapHeight,
-                                    ),
-                                  );
-                                },
+                          onTapUp: (details) {
+                            if (pinchGuard.value) return;
+                            _save(
+                              controller.add(
+                                type: _selectedType,
+                                x: (details.localPosition.dx /
+                                        MapViewport.cellSize)
+                                    .floor(),
+                                y: (details.localPosition.dy /
+                                        MapViewport.cellSize)
+                                    .floor(),
+                                mapWidth: store.mapWidth,
+                                mapHeight: store.mapHeight,
+                              ),
+                            );
+                          },
+                          onPanStart: (details) =>
+                              _backgroundPointer = details.globalPosition,
+                          onPanUpdate: (details) {
+                            if (pinchGuard.value) {
+                              _backgroundPointer = null;
+                              return;
+                            }
+                            final previous = _backgroundPointer;
+                            _backgroundPointer = details.globalPosition;
+                            if (previous == null) return;
+                            final delta = details.globalPosition - previous;
+                            final next = transform.value.clone();
+                            next.storage[12] += delta.dx;
+                            next.storage[13] += delta.dy;
+                            transform.value = next;
+                          },
+                          onPanEnd: (_) => _backgroundPointer = null,
+                          onPanCancel: () => _backgroundPointer = null,
                           child: CustomPaint(
                             painter: _GridPainter(
                               columns: store.mapWidth,
@@ -174,7 +185,7 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
                         rows: store.mapHeight,
                         transform: transform,
                         pinchGuard: pinchGuard,
-                        enabled: !_navigate,
+                        enabled: true,
                         onMove: (x, y) async {
                           final saved = await controller.move(
                             id: object.id,
@@ -205,9 +216,7 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               child: Text(
-                _navigate
-                    ? 'スワイプで画面移動 / ピンチで拡大・縮小'
-                    : '1本指で棚を移動 / 2本指で拡大・縮小 / 空きマスをタップで配置',
+                '棚をドラッグで移動 / 空き場所をスワイプで画面移動\n2本指で拡大・縮小 / 空きマスをタップで配置',
               ),
             ),
           ],

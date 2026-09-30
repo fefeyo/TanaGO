@@ -8,13 +8,13 @@ class MapViewport extends StatefulWidget {
     required this.columns,
     required this.rows,
     required this.builder,
-    this.navigationEnabled = true,
+    this.editing = false,
   });
 
   static const cellSize = 36.0;
   final int columns;
   final int rows;
-  final bool navigationEnabled;
+  final bool editing;
   final Widget Function(
     TransformationController transform,
     ValueListenable<bool> pinchGuard,
@@ -48,7 +48,7 @@ class _MapViewportState extends State<MapViewport> {
   }
 
   void _pointerDown(PointerDownEvent event) {
-    if (widget.navigationEnabled) return;
+    if (!widget.editing) return;
     _pointers[event.pointer] = event.localPosition;
     _beginPinch();
   }
@@ -92,21 +92,6 @@ class _MapViewportState extends State<MapViewport> {
     super.dispose();
   }
 
-  void _zoom(double factor, Size viewport) {
-    final scale = _transform.value.getMaxScaleOnAxis();
-    final next = (scale * factor).clamp(0.02, 3.0);
-    final center = viewport.center(Offset.zero);
-    final scene = _transform.toScene(center);
-    _transform.value = Matrix4.identity()
-      ..translateByDouble(
-        center.dx - scene.dx * next,
-        center.dy - scene.dy * next,
-        0,
-        1,
-      )
-      ..scaleByDouble(next, next, next, 1);
-  }
-
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
@@ -128,8 +113,8 @@ class _MapViewportState extends State<MapViewport> {
                   minScale: 0.02,
                   maxScale: 3,
                   boundaryMargin: const EdgeInsets.all(80),
-                  panEnabled: widget.navigationEnabled,
-                  scaleEnabled: widget.navigationEnabled,
+                  panEnabled: !widget.editing,
+                  scaleEnabled: !widget.editing,
                   child: SizedBox(
                     width: widget.columns * MapViewport.cellSize,
                     height: widget.rows * MapViewport.cellSize,
@@ -148,11 +133,6 @@ class _MapViewportState extends State<MapViewport> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
-                      tooltip: '縮小',
-                      onPressed: () => _zoom(1 / 1.3, size),
-                      icon: const Icon(Icons.remove),
-                    ),
-                    IconButton(
                       tooltip: '全体を表示',
                       onPressed: () {
                         final scale = ((size.width - 24) /
@@ -167,11 +147,6 @@ class _MapViewportState extends State<MapViewport> {
                           ..scaleByDouble(fit, fit, fit, 1);
                       },
                       icon: const Icon(Icons.fit_screen),
-                    ),
-                    IconButton(
-                      tooltip: '拡大',
-                      onPressed: () => _zoom(1.3, size),
-                      icon: const Icon(Icons.add),
                     ),
                   ],
                 ),

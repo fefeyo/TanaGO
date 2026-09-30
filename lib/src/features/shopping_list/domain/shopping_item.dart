@@ -27,7 +27,10 @@ class ShoppingItem {
   final String addedByUid;
   final DateTime createdAt;
   final String? categoryId;
+  // Keep the stored priority compatible with previously distributed clients.
+  // Only the old high value maps to the current "buy soon" toggle.
   final ShoppingPriority priority;
+  bool get buySoon => priority == ShoppingPriority.high;
   final bool isPurchased;
   final String? purchasedByUid;
   final DateTime? purchasedAt;
