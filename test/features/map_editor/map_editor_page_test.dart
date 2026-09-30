@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:tanago/src/features/product_categories/data/in_memory_category_repository.dart';
+import 'package:tanago/src/features/product_categories/presentation/category_controller.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tanago/src/features/household/domain/household.dart';
@@ -37,6 +39,8 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          categoryRepositoryProvider
+              .overrideWithValue(InMemoryCategoryRepository()),
           householdProvider.overrideWith(
             (ref) => Stream.value(
               const Household(id: 'h', name: '家', createdByUid: 'u'),

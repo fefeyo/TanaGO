@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../design/app_components.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../household/presentation/household_controller.dart';
@@ -41,19 +42,12 @@ class ShoppingSelectionPage extends ConsumerWidget {
           children: [
             Padding(
               padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    store?.name ?? '選択した店舗',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const Text('この店の棚に設定されたカテゴリから選びます。'),
-                  if (allCount > items.length && eligible.hasValue)
-                    Text(
-                      '未分類・この店に未設定の商品 ${allCount - items.length}点は登録一覧に残ります。',
-                    ),
-                ],
+              child: PageBanner(
+                eyebrow: '今日の買い物 / $selectedCount点を選択中',
+                title: store?.name ?? '選択した店舗',
+                icon: Icons.shopping_basket_outlined,
+                description: 'この店の棚に設定されたカテゴリから選びます。'
+                    '${allCount > items.length && eligible.hasValue ? '\n未分類・この店に未設定の商品 ${allCount - items.length}点は登録一覧に残ります。' : ''}',
               ),
             ),
             Expanded(
@@ -83,29 +77,35 @@ class ShoppingSelectionPage extends ConsumerWidget {
                         ),
                       )
                     : ListView(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
                         children: [
                           for (final categoryId in groups)
-                            ExpansionTile(
-                              key: PageStorageKey('trip-$storeId-$categoryId'),
-                              initiallyExpanded: true,
-                              title: Text(categoryName(categories, categoryId)),
-                              subtitle: Text(
-                                '${items.where((i) => i.categoryId == categoryId).length}点',
+                            Card(
+                              child: ExpansionTile(
+                                leading: CategorySymbol(categoryId: categoryId),
+                                key:
+                                    PageStorageKey('trip-$storeId-$categoryId'),
+                                initiallyExpanded: true,
+                                title:
+                                    Text(categoryName(categories, categoryId)),
+                                subtitle: Text(
+                                  '${items.where((i) => i.categoryId == categoryId).length}点',
+                                ),
+                                children: [
+                                  for (final item in items
+                                      .where((i) => i.categoryId == categoryId))
+                                    CheckboxListTile(
+                                      key: ValueKey('select-${item.id}'),
+                                      title: Text(item.name),
+                                      value: trip.selected.contains(item.id),
+                                      onChanged: (value) => ref
+                                          .read(
+                                            shoppingTripProvider(key).notifier,
+                                          )
+                                          .select(item.id, value ?? false),
+                                    ),
+                                ],
                               ),
-                              children: [
-                                for (final item in items
-                                    .where((i) => i.categoryId == categoryId))
-                                  CheckboxListTile(
-                                    key: ValueKey('select-${item.id}'),
-                                    title: Text(item.name),
-                                    value: trip.selected.contains(item.id),
-                                    onChanged: (value) => ref
-                                        .read(
-                                          shoppingTripProvider(key).notifier,
-                                        )
-                                        .select(item.id, value ?? false),
-                                  ),
-                              ],
                             ),
                         ],
                       ),

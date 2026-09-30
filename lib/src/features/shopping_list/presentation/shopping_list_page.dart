@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import '../../../design/app_components.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../household/domain/household.dart';
+import '../../household/presentation/my_name_card.dart';
 import '../../household/presentation/household_controller.dart';
 import '../../product_categories/presentation/category_controller.dart';
 import 'shopping_item_dialog.dart';
@@ -40,34 +42,28 @@ class ShoppingListPage extends ConsumerWidget {
             icon: const Icon(Icons.group_outlined),
           ),
         ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(32),
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Text(household.name),
-          ),
-        ),
       ),
       body: SafeArea(
         child: Column(
           children: [
+            MyNameCard(householdId: household.id, onlyWhenMissing: true),
             Padding(
               padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      '${items.length}点の買いたいもの',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
+              child: PageBanner(
+                eyebrow: household.name,
+                title: '${items.length}点の買いたいもの',
+                icon: Icons.home_outlined,
+                description: '家族の「買ってきて」を、ひとつに。',
+                trailing: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFE7F0CD),
+                    foregroundColor: const Color(0xFF214C36),
                   ),
-                  FilledButton.icon(
-                    onPressed: () =>
-                        showShoppingItemDialog(context, household.id),
-                    icon: const Icon(Icons.add),
-                    label: const Text('登録'),
-                  ),
-                ],
+                  onPressed: () =>
+                      showShoppingItemDialog(context, household.id),
+                  icon: const Icon(Icons.add, size: 20),
+                  label: const Text('登録'),
+                ),
               ),
             ),
             Expanded(
@@ -81,78 +77,85 @@ class ShoppingListPage extends ConsumerWidget {
                   ),
                 ),
                 data: (_) => items.isEmpty
-                    ? const Center(
-                        child: Text(
-                          '買いたいものを登録して\n家族と共有しましょう',
-                          textAlign: TextAlign.center,
-                        ),
+                    ? const EmptyState(
+                        icon: Icons.shopping_basket_outlined,
+                        message: '買いたいものを登録して\n家族と共有しましょう',
                       )
                     : ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
                         itemCount: items.length,
                         itemBuilder: (context, index) {
                           final item = items[index];
-                          return ListTile(
-                            key: ValueKey(item.id),
-                            title: Text(item.name),
-                            subtitle: Text(
-                              '${categoryName(categories, item.categoryId)} ・ ${memberName(members, item.addedByUid)}が登録',
-                            ),
-                            onTap: () => showShoppingItemDialog(
-                              context,
-                              household.id,
-                              item: item,
-                            ),
-                            trailing: IconButton(
-                              tooltip: '削除',
-                              icon: const Icon(Icons.delete_outline),
-                              onPressed: () async {
-                                final remove = await showDialog<bool>(
-                                  context: context,
-                                  builder: (c) => AlertDialog(
-                                    title: Text(
-                                      '${item.name}を削除しますか？',
+                          return Card(
+                            child: ListTile(
+                              key: ValueKey(item.id),
+                              leading:
+                                  CategorySymbol(categoryId: item.categoryId),
+                              title: Text(
+                                item.name,
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                              subtitle: Text(
+                                '${categoryName(categories, item.categoryId)} ・ ${memberName(members, item.addedByUid)}が登録',
+                              ),
+                              onTap: () => showShoppingItemDialog(
+                                context,
+                                household.id,
+                                item: item,
+                              ),
+                              trailing: IconButton(
+                                tooltip: '削除',
+                                icon: const Icon(Icons.delete_outline),
+                                onPressed: () async {
+                                  final remove = await showDialog<bool>(
+                                    context: context,
+                                    builder: (c) => AlertDialog(
+                                      title: Text(
+                                        '${item.name}を削除しますか？',
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(
+                                            c,
+                                            false,
+                                          ),
+                                          child: const Text(
+                                            'キャンセル',
+                                          ),
+                                        ),
+                                        FilledButton(
+                                          onPressed: () => Navigator.pop(
+                                            c,
+                                            true,
+                                          ),
+                                          child: const Text('削除'),
+                                        ),
+                                      ],
                                     ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(
-                                          c,
-                                          false,
-                                        ),
-                                        child: const Text(
-                                          'キャンセル',
-                                        ),
-                                      ),
-                                      FilledButton(
-                                        onPressed: () => Navigator.pop(
-                                          c,
-                                          true,
-                                        ),
-                                        child: const Text('削除'),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                                if (remove != true || !context.mounted) {
-                                  return;
-                                }
-                                try {
-                                  await ref
-                                      .read(
-                                        shoppingListControllerProvider(
-                                          household.id,
-                                        ),
-                                      )
-                                      .remove(item.id);
-                                } catch (_) {
-                                  if (context.mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('削除できませんでした'),
-                                      ),
-                                    );
+                                  );
+                                  if (remove != true || !context.mounted) {
+                                    return;
                                   }
-                                }
-                              },
+                                  try {
+                                    await ref
+                                        .read(
+                                          shoppingListControllerProvider(
+                                            household.id,
+                                          ),
+                                        )
+                                        .remove(item.id);
+                                  } catch (_) {
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                          content: Text('削除できませんでした'),
+                                        ),
+                                      );
+                                    }
+                                  }
+                                },
+                              ),
                             ),
                           );
                         },

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import '../../../design/app_components.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/household.dart';
 import '../../auth/presentation/auth_controller.dart';
 import 'member_name_dialog.dart';
+import 'my_name_card.dart';
 import 'household_controller.dart';
 
 class HouseholdPage extends ConsumerWidget {
@@ -27,41 +29,49 @@ class HouseholdPage extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Text(
-            household.name,
-            style: Theme.of(context).textTheme.headlineSmall,
+          PageBanner(
+            eyebrow: '家族の共有スペース',
+            title: household.name,
+            description: '${members.length}人で共有中',
+            icon: Icons.home_outlined,
           ),
-          const SizedBox(height: 8),
-          Text('${members.length}人で共有中'),
+          const SizedBox(height: 12),
+          MyNameCard(householdId: household.id),
           const SizedBox(height: 24),
           Text('メンバー', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           for (final member in members)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: CircleAvatar(
-                child: Text(
-                  memberName(members, member.uid).characters.first,
+            Card(
+              child: ListTile(
+                leading: CircleAvatar(
+                  child: Text(
+                    memberName(members, member.uid).characters.first,
+                  ),
                 ),
-              ),
-              title: Text(
-                '${memberName(members, member.uid)}${member.uid == myUid ? '（自分）' : ''}',
-              ),
-              trailing: member.uid == myUid
-                  ? IconButton(
-                      tooltip: '名前を変更',
-                      icon: const Icon(Icons.edit_outlined),
-                      onPressed: () => showDialog<void>(
-                        context: context,
-                        builder: (_) => MemberNameDialog(
-                          householdId: household.id,
-                          name: member.displayName,
+                title: Text(
+                  '${memberName(members, member.uid)}${member.uid == myUid ? '（自分）' : ''}',
+                ),
+                trailing: member.uid == myUid
+                    ? IconButton(
+                        tooltip: '名前を変更',
+                        icon: const Icon(Icons.edit_outlined),
+                        onPressed: () => showDialog<void>(
+                          context: context,
+                          builder: (_) => MemberNameDialog(
+                            householdId: household.id,
+                            name: hasMemberName(
+                              member.displayName,
+                              uid: member.uid,
+                            )
+                                ? member.displayName
+                                : '',
+                          ),
                         ),
-                      ),
-                    )
-                  : null,
-              subtitle: Text(
-                member.role == HouseholdRole.owner ? 'オーナー' : 'メンバー',
+                      )
+                    : null,
+                subtitle: Text(
+                  member.role == HouseholdRole.owner ? 'オーナー' : 'メンバー',
+                ),
               ),
             ),
           const SizedBox(height: 24),

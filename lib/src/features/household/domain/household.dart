@@ -27,10 +27,15 @@ enum HouseholdRole {
   member,
 }
 
+bool hasMemberName(String name, {String? uid}) =>
+    name.trim().isNotEmpty && name.trim() != 'あなた' && name.trim() != uid;
+
 String memberName(List<HouseholdMember> members, String uid) {
   final member = members.where((m) => m.uid == uid).firstOrNull;
-  final name = member?.displayName.trim();
-  if (name != null && name.isNotEmpty && name != 'あなた') return name;
-  final suffix = uid.length > 6 ? uid.substring(uid.length - 6) : uid;
-  return 'メンバー $suffix';
+  if (member != null && hasMemberName(member.displayName, uid: uid)) {
+    return member.displayName.trim();
+  }
+  final sortedUids = members.map((m) => m.uid).toList()..sort();
+  final index = sortedUids.indexOf(uid);
+  return index < 0 ? '名前未設定のメンバー' : 'メンバー${index + 1}（名前未設定）';
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../design/app_components.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -29,27 +30,48 @@ class StoreListPage extends ConsumerWidget {
                   ),
                 )
               : stores.isEmpty
-                  ? const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(24),
-                        child: Text(
-                          'まだ店舗がありません。\nよく行くスーパーを登録しましょう。',
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
+                  ? const EmptyState(
+                      icon: Icons.storefront_outlined,
+                      message: 'まだ店舗がありません。\nよく行くスーパーを登録しましょう。',
                     )
                   : ListView.separated(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: stores.length,
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+                      itemCount: stores.length + 1,
                       separatorBuilder: (_, __) => const SizedBox(height: 8),
                       itemBuilder: (context, index) {
-                        final store = stores[index];
+                        if (index == 0) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: PageBanner(
+                              eyebrow: shopping ? '買い物の準備' : 'いつものお店',
+                              title: shopping ? '今日はどこで買う？' : '売り場を、わが家の地図に。',
+                              description: shopping
+                                  ? 'お店を選んで、今日の買い物リストを作りましょう。'
+                                  : '${stores.length}店舗のマップを家族で共有しています。',
+                              icon: Icons.storefront_outlined,
+                            ),
+                          );
+                        }
+                        final store = stores[index - 1];
                         return Card(
                           child: ListTile(
-                            leading: const Icon(Icons.storefront),
-                            title: Text(store.name),
+                            leading: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE8EFE3),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: const Icon(
+                                Icons.storefront_outlined,
+                                color: Color(0xFF246653),
+                              ),
+                            ),
+                            title: Text(
+                              store.name,
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
                             subtitle: Text(
-                              shopping ? 'この店で買うものを選ぶ' : '店内マップと棚のカテゴリを編集',
+                              shopping ? 'この店で買うものを選ぶ' : '店内マップと売り場を確認',
                             ),
                             trailing: IconButton(
                               tooltip: '店内マップを編集',
@@ -58,7 +80,7 @@ class StoreListPage extends ConsumerWidget {
                               icon: const Icon(Icons.edit_outlined),
                             ),
                             onTap: () => context.push(
-                              '/stores/${store.id}/${shopping ? 'select' : 'map/edit'}',
+                              '/stores/${store.id}/${shopping ? 'select' : 'map'}',
                             ),
                           ),
                         );

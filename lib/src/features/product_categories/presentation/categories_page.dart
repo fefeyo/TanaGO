@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../design/app_components.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../household/presentation/household_controller.dart';
 import 'category_controller.dart';
@@ -20,24 +21,31 @@ class CategoriesPage extends ConsumerWidget {
               ),
             ),
             data: (categories) => ListView(
+              padding: const EdgeInsets.all(16),
               children: [
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text('カテゴリは家族で共有され、商品と店舗の棚に設定できます。'),
+                const PageBanner(
+                  eyebrow: 'わが家の整理整頓',
+                  title: '売り場とリストをつなぐ。',
+                  icon: Icons.category_outlined,
+                  description: 'カテゴリは家族で共有され、商品と店舗の棚に設定できます。',
                 ),
+                const SizedBox(height: 20),
                 for (final category in categories)
-                  ListTile(
-                    title: Text(category.name),
-                    trailing: category.id.startsWith('custom_')
-                        ? const Icon(Icons.edit_outlined)
-                        : null,
-                    onTap: category.id.startsWith('custom_')
-                        ? () => showCategoryDialog(
-                              context,
-                              hid,
-                              category: category,
-                            )
-                        : null,
+                  Card(
+                    child: ListTile(
+                      leading: CategorySymbol(categoryId: category.id),
+                      title: Text(category.name),
+                      trailing: category.id.startsWith('custom_')
+                          ? const Icon(Icons.edit_outlined)
+                          : null,
+                      onTap: category.id.startsWith('custom_')
+                          ? () => showCategoryDialog(
+                                context,
+                                hid,
+                                category: category,
+                              )
+                          : null,
+                    ),
                   ),
                 const SizedBox(height: 90),
               ],

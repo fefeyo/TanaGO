@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'household_controller.dart';
+import '../domain/household.dart';
 
 class MemberNameDialog extends ConsumerStatefulWidget {
   const MemberNameDialog({
@@ -15,8 +16,9 @@ class MemberNameDialog extends ConsumerStatefulWidget {
 }
 
 class _MemberNameDialogState extends ConsumerState<MemberNameDialog> {
-  late final _name =
-      TextEditingController(text: widget.name == 'あなた' ? '' : widget.name);
+  late final _name = TextEditingController(
+    text: !hasMemberName(widget.name) ? '' : widget.name,
+  );
   bool _saving = false;
   String? _error;
   @override
@@ -27,8 +29,8 @@ class _MemberNameDialogState extends ConsumerState<MemberNameDialog> {
 
   Future<void> _save() async {
     if (_saving) return;
-    if (_name.text.trim().isEmpty) {
-      setState(() => _error = '名前を入力してください');
+    if (!hasMemberName(_name.text)) {
+      setState(() => _error = '「あなた」以外の名前を入力してください');
       return;
     }
     setState(() {

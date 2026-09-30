@@ -6,6 +6,8 @@ import '../../stores/domain/store.dart';
 import '../../stores/presentation/store_controller.dart';
 import 'draggable_map_object.dart';
 import 'map_viewport.dart';
+import 'map_object_content.dart';
+import '../../product_categories/domain/product_category.dart';
 
 import '../../product_categories/presentation/category_controller.dart';
 import '../../product_categories/presentation/category_dialog.dart';
@@ -44,6 +46,9 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
     );
     final storesAsync = ref.watch(storesProvider(household.id));
     final objectsAsync = ref.watch(mapEditorProvider(mapKey));
+    final categories =
+        ref.watch(categoriesProvider(household.id)).valueOrNull ??
+            <ProductCategory>[];
     final store = storesAsync.valueOrNull
         ?.where((store) => store.id == widget.storeId)
         .firstOrNull;
@@ -179,6 +184,7 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
                       onLongPress: () => _confirmDelete(object),
                       child: _MapObjectTile(
                         object: object,
+                        categories: categories,
                         isSelected: object.id == _selectedObjectId,
                       ),
                     ),
@@ -658,9 +664,14 @@ class _Stepper extends StatelessWidget {
 }
 
 class _MapObjectTile extends StatelessWidget {
-  const _MapObjectTile({required this.object, required this.isSelected});
+  const _MapObjectTile({
+    required this.object,
+    required this.categories,
+    required this.isSelected,
+  });
 
   final MapObject object;
+  final List<ProductCategory> categories;
   final bool isSelected;
 
   @override
@@ -699,36 +710,7 @@ class _MapObjectTile extends StatelessWidget {
               ]
             : null,
       ),
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                switch (object.type) {
-                  MapObjectType.shelf => Icons.view_agenda_outlined,
-                  MapObjectType.wall => Icons.horizontal_rule,
-                  MapObjectType.entrance => Icons.login,
-                  MapObjectType.exit => Icons.logout,
-                  MapObjectType.register => Icons.point_of_sale,
-                },
-                size: 18,
-              ),
-              if (object.label != null && object.label!.isNotEmpty) ...[
-                const SizedBox(width: 4),
-                Flexible(
-                  child: Text(
-                    object.label!,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.labelSmall,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
+      child: MapObjectContent(object: object, categories: categories),
     );
   }
 }

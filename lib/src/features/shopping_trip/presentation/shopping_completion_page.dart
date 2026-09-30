@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../design/app_components.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../household/presentation/household_controller.dart';
@@ -40,29 +41,18 @@ class _ShoppingCompletionPageState
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  children: [
-                    Icon(
-                      _completed == null
-                          ? Icons.shopping_bag_outlined
-                          : Icons.check_circle_outline,
-                      size: 48,
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      _completed == null
-                          ? 'チェックした${checked.length}点を購入済みにします'
-                          : '${shown.length}点の購入が完了しました',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _completed == null
-                          ? '確定すると登録一覧から消えます。未チェックの商品は残ります。'
-                          : '購入した商品を登録一覧から削除しました。',
-                    ),
-                  ],
+                padding: const EdgeInsets.all(16),
+                child: PageBanner(
+                  eyebrow: _completed == null ? '最後に購入内容を確認' : 'お買い物、おつかれさまでした',
+                  icon: _completed == null
+                      ? Icons.shopping_bag_outlined
+                      : Icons.task_alt,
+                  title: _completed == null
+                      ? 'チェックした${checked.length}点を購入済みにします'
+                      : '${shown.length}点の購入が完了しました',
+                  description: _completed == null
+                      ? '確定すると登録一覧から消えます。未チェックの商品は残ります。'
+                      : '購入した商品を登録一覧から削除しました。',
                 ),
               ),
               if (asyncItems.isLoading && _completed == null)
@@ -71,11 +61,18 @@ class _ShoppingCompletionPageState
                 const Text('購入内容を読み込めませんでした。マップに戻って再読み込みしてください。'),
               Expanded(
                 child: ListView(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
                   children: [
                     for (final item in shown)
-                      ListTile(
-                        title: Text(item.name),
-                        leading: const Icon(Icons.check),
+                      Card(
+                        child: ListTile(
+                          title: Text(item.name),
+                          leading: CategorySymbol(categoryId: item.categoryId),
+                          trailing: const Icon(
+                            Icons.check_circle,
+                            color: Color(0xFF246653),
+                          ),
+                        ),
                       ),
                   ],
                 ),

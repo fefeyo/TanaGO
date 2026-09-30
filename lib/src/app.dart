@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'design/app_theme.dart';
+
 import 'features/auth/presentation/auth_controller.dart';
 import 'features/household/presentation/household_controller.dart';
 import 'features/household/presentation/household_page.dart';
@@ -80,12 +82,7 @@ class TanaGoApp extends ConsumerWidget {
     return MaterialApp.router(
       title: 'TanaGO',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF2E7D32),
-        ),
-        useMaterial3: true,
-      ),
+      theme: buildAppTheme(),
       routerConfig: ref.watch(_routerProvider),
     );
   }

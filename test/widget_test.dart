@@ -49,6 +49,9 @@ void main() {
       180,
       scrollable: find.byType(Scrollable).first,
     );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(inviteField);
+    await tester.pumpAndSettle();
     await tester.tap(inviteField);
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);

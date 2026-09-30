@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import '../../../design/app_components.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'household_controller.dart';
+import '../domain/household.dart';
 
 class HouseholdSetupPage extends ConsumerStatefulWidget {
   const HouseholdSetupPage({super.key});
@@ -31,24 +33,13 @@ class _HouseholdSetupPageState extends ConsumerState<HouseholdSetupPage> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(24, 48, 24, 24),
           children: [
-            Icon(
-              Icons.shopping_basket_rounded,
-              size: 56,
-              color: Theme.of(context).colorScheme.primary,
+            const PageBanner(
+              eyebrow: '家族とつながる、お買い物',
+              title: 'TanaGO',
+              icon: Icons.shopping_basket_outlined,
+              description: '家族の「買ってきて」を、\n迷わず買えるリストに。',
             ),
-            const SizedBox(height: 16),
-            Text(
-              'TanaGO',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              '家族の「買ってきて」を、\n迷わず買えるリストに。',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 48),
+            const SizedBox(height: 28),
             TextField(
               controller: _displayNameController,
               enabled: !_isSubmitting,
@@ -56,7 +47,6 @@ class _HouseholdSetupPageState extends ConsumerState<HouseholdSetupPage> {
               decoration: const InputDecoration(
                 labelText: 'あなたの名前',
                 hintText: '例：ゆう',
-                border: OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 24),
@@ -68,7 +58,6 @@ class _HouseholdSetupPageState extends ConsumerState<HouseholdSetupPage> {
               decoration: const InputDecoration(
                 labelText: '世帯名',
                 hintText: '例：わが家',
-                border: OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 12),
@@ -99,7 +88,6 @@ class _HouseholdSetupPageState extends ConsumerState<HouseholdSetupPage> {
               decoration: const InputDecoration(
                 labelText: '招待コード',
                 hintText: 'コピーした TANA-… のコード',
-                border: OutlineInputBorder(),
               ),
               onSubmitted: (_) => _joinHousehold(),
             ),
@@ -135,9 +123,9 @@ class _HouseholdSetupPageState extends ConsumerState<HouseholdSetupPage> {
 
   Future<void> _submit(Future<void> Function() action) async {
     if (_isSubmitting) return;
-    if (_displayNameController.text.trim().isEmpty) {
+    if (!hasMemberName(_displayNameController.text)) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('あなたの名前を入力してください')));
+          .showSnackBar(const SnackBar(content: Text('「あなた」以外の名前を入力してください')));
       return;
     }
     setState(() => _isSubmitting = true);

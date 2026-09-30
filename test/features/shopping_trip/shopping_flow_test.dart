@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tanago/src/app.dart';
+import 'package:tanago/src/features/product_categories/domain/product_category.dart';
+import 'package:tanago/src/features/household/domain/household.dart';
 import 'package:tanago/src/features/auth/data/in_memory_auth_repository.dart';
 import 'package:tanago/src/features/auth/presentation/auth_controller.dart';
 import 'package:tanago/src/features/household/data/in_memory_household_repository.dart';
@@ -115,6 +117,118 @@ class FailingCompletionRepository extends InMemoryShoppingListRepository {
 }
 
 void main() {
+  testWidgets('shopping remains usable on a compact screen with larger text',
+      (tester) async {
+    final f = FlowFixture();
+    await f.mount(tester);
+    tester.view.physicalSize = const Size(320, 640);
+    tester.platformDispatcher.textScaleFactorTestValue = 1.3;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.text('買い物に行く'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('スーパーA'));
+    await tester.tap(find.text('スーパーA'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    await tester.ensureVisible(find.byKey(const ValueKey('select-milk')));
+    await tester.tap(find.byKey(const ValueKey('select-milk')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('1点を持って店内マップへ'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.byKey(const ValueKey('map-label-shelf')));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    await tester.ensureVisible(find.widgetWithText(CheckboxListTile, '牛乳'));
+    await tester.tap(find.widgetWithText(CheckboxListTile, '牛乳'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('チェックした1点の購入を完了する'));
+    await tester.pumpAndSettle();
+    expect(find.text('購入を確定する'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'missing name can be set from the registration screen without showing a UID',
+      (tester) async {
+    final f = FlowFixture();
+    await f.mount(tester);
+    await f.homes.updateMemberName(f.hid, 'local-user', 'local-user');
+    await tester.pumpAndSettle();
+    expect(find.textContaining('local-user'), findsNothing);
+    await tester.tap(find.text('名前を設定'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextField, '名前'), 'たろう');
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+    expect(find.text('名前を設定'), findsNothing);
+    expect(find.text('乳製品・卵 ・ たろうが登録'), findsOneWidget);
+    await tester.tap(find.byTooltip('わが家'));
+    await tester.pumpAndSettle();
+    expect(find.text('自分の名前を変更'), findsOneWidget);
+    expect(find.text('たろう（自分）'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'browsing map shows shelf and custom category labels, including unselected shelves',
+      (tester) async {
+    final f = FlowFixture();
+    await f.mount(tester);
+    const custom = ProductCategory(id: 'custom_test', name: '健康食品・サプリメント');
+    await f.categories.save(f.hid, custom);
+    await f.maps.saveObject(
+      StoreMapKey(householdId: f.hid, storeId: 's'),
+      const MapObject(
+        id: 'health',
+        type: MapObjectType.shelf,
+        x: 1,
+        y: 3,
+        width: 1,
+        height: 1,
+        label: '健康コーナー',
+        categoryIds: ['custom_test', 'daily_goods'],
+      ),
+    );
+    await tester.tap(find.byTooltip('店舗を管理'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('スーパーA'));
+    await tester.pumpAndSettle();
+    expect(find.text('売り場を確認'), findsOneWidget);
+    expect(find.byKey(const ValueKey('map-categories-shelf')), findsOneWidget);
+    expect(
+      tester
+          .widget<Text>(find.byKey(const ValueKey('map-categories-shelf')))
+          .data,
+      '乳製品・卵',
+    );
+    expect(find.byKey(const ValueKey('map-categories-health')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('map-label-health')));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(Chip, '健康食品・サプリメント'), findsOneWidget);
+    expect(find.widgetWithText(Chip, '日用品'), findsOneWidget);
+    expect(find.text('今回この棚で買うものはありません。'), findsOneWidget);
+    await f.categories
+        .save(f.hid, const ProductCategory(id: 'custom_test', name: 'サプリ'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(Chip, 'サプリ'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  test('legacy unnamed members use readable placeholders, never IDs', () {
+    const members = [
+      HouseholdMember(
+        uid: 'private-id',
+        displayName: 'あなた',
+        role: HouseholdRole.owner,
+      ),
+    ];
+    expect(memberName(members, 'private-id'), 'メンバー1（名前未設定）');
+    expect(memberName(members, 'unknown-private-id'), '名前未設定のメンバー');
+  });
+
   testWidgets('new store is saved before the input dialog closes',
       (tester) async {
     final f = FlowFixture();
@@ -204,7 +318,7 @@ void main() {
     expect(find.text('健康食品 ・ ゆうが登録'), findsOneWidget);
     await tester.tap(find.byTooltip('店舗を管理'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('スーパーA'));
+    await tester.tap(find.byTooltip('店内マップを編集'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('map-object-shelf')));
     await tester.pumpAndSettle();
