@@ -166,7 +166,7 @@ class _ShoppingMapPageState extends ConsumerState<ShoppingMapPage> {
                               : MapViewport(
                                   columns: store.mapWidth,
                                   rows: store.mapHeight,
-                                  builder: (_) => Stack(
+                                  builder: (_, __) => Stack(
                                     children: [
                                       const Positioned.fill(
                                         child: RepaintBoundary(
@@ -419,6 +419,9 @@ class _ShelfItemsPanel extends StatelessWidget {
                     dense: true,
                     value: checked.contains(item.id),
                     title: Text(item.name),
+                    subtitle: item.priority == ShoppingPriority.normal
+                        ? null
+                        : Text('優先度：${item.priority.label}'),
                     onChanged: (_) => onTogglePurchased(item.id),
                   );
                 },

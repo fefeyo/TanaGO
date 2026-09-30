@@ -132,7 +132,7 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
                 columns: store.mapWidth,
                 rows: store.mapHeight,
                 navigationEnabled: _navigate,
-                builder: (transform) => Stack(
+                builder: (transform, pinchGuard) => Stack(
                   children: [
                     Positioned.fill(
                       child: RepaintBoundary(
@@ -141,7 +141,9 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
                           behavior: HitTestBehavior.opaque,
                           onTapUp: _navigate
                               ? null
-                              : (details) => _save(
+                              : (details) {
+                                  if (pinchGuard.value) return;
+                                  _save(
                                     controller.add(
                                       type: _selectedType,
                                       x: (details.localPosition.dx /
@@ -153,7 +155,8 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
                                       mapWidth: store.mapWidth,
                                       mapHeight: store.mapHeight,
                                     ),
-                                  ),
+                                  );
+                                },
                           child: CustomPaint(
                             painter: _GridPainter(
                               columns: store.mapWidth,
@@ -170,6 +173,7 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
                         columns: store.mapWidth,
                         rows: store.mapHeight,
                         transform: transform,
+                        pinchGuard: pinchGuard,
                         enabled: !_navigate,
                         onMove: (x, y) async {
                           final saved = await controller.move(
@@ -201,7 +205,9 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               child: Text(
-                _navigate ? 'スワイプで画面移動 / ピンチで拡大・縮小' : '空きマスをタップで配置 / 棚をドラッグで移動',
+                _navigate
+                    ? 'スワイプで画面移動 / ピンチで拡大・縮小'
+                    : '1本指で棚を移動 / 2本指で拡大・縮小 / 空きマスをタップで配置',
               ),
             ),
           ],

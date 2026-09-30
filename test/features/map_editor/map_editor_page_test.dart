@@ -17,6 +17,109 @@ import 'package:tanago/src/features/stores/presentation/store_controller.dart';
 
 void main() {
   testWidgets(
+      'edit mode pinches on shelves and empty floor without placing or saving a drag',
+      (tester) async {
+    tester.view.physicalSize = const Size(400, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final stores = InMemoryStoreRepository();
+    final maps = InMemoryMapRepository();
+    const key = StoreMapKey(householdId: 'h', storeId: 's');
+    await stores.addStore(
+      'h',
+      const Store(
+        id: 's',
+        householdId: 'h',
+        name: '店',
+        mapWidth: 12,
+        mapHeight: 16,
+      ),
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          categoryRepositoryProvider
+              .overrideWithValue(InMemoryCategoryRepository()),
+          householdProvider.overrideWith(
+            (ref) => Stream.value(
+              const Household(id: 'h', name: '家', createdByUid: 'u'),
+            ),
+          ),
+          storeRepositoryProvider.overrideWithValue(stores),
+          mapRepositoryProvider.overrideWithValue(maps),
+        ],
+        child: const MaterialApp(home: MapEditorPage(storeId: 's')),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+
+    await maps.saveObject(
+      key,
+      const MapObject(
+        id: 'pinch-shelf',
+        type: MapObjectType.shelf,
+        x: 2,
+        y: 3,
+        width: 3,
+        height: 1,
+      ),
+    );
+    await tester.pumpAndSettle();
+    final viewer =
+        tester.widget<InteractiveViewer>(find.byType(InteractiveViewer));
+    final transform = viewer.transformationController!;
+    final tile = find.byKey(const ValueKey('map-object-pinch-shelf'));
+    final origin = tester.getCenter(tile);
+    final first = await tester.startGesture(origin, pointer: 1);
+    // Begin as a real one-finger shelf drag, then change to a pinch.
+    await first.moveBy(const Offset(35, 0));
+    await tester.pump();
+    final second =
+        await tester.startGesture(origin + const Offset(130, 0), pointer: 2);
+    await first.moveBy(const Offset(-30, 0));
+    await second.moveBy(const Offset(30, 0));
+    await tester.pump();
+    expect(transform.value.getMaxScaleOnAxis(), greaterThan(1));
+    await first.moveBy(const Offset(50, 0));
+    await second.moveBy(const Offset(-50, 0));
+    await tester.pump();
+    expect(transform.value.getMaxScaleOnAxis(), lessThan(1));
+    await first.up();
+    await tester.pump();
+    await second.moveBy(const Offset(20, 20));
+    await second.up();
+    await tester.pumpAndSettle();
+    expect((await maps.getObjects(key)).single.x, 2);
+    expect((await maps.getObjects(key)).single.y, 3);
+    expect(find.byType(AlertDialog), findsNothing);
+
+    // A two-finger gesture on an empty cell must not create a new object.
+    final center = tester.getCenter(find.byKey(const ValueKey('map-viewport')));
+    final left =
+        await tester.startGesture(center - const Offset(60, 0), pointer: 3);
+    final right =
+        await tester.startGesture(center + const Offset(60, 0), pointer: 4);
+    final before = transform.value.getMaxScaleOnAxis();
+    await left.moveBy(const Offset(-20, 0));
+    await right.moveBy(const Offset(20, 0));
+    await left.up();
+    await right.up();
+    await tester.pumpAndSettle();
+    expect(transform.value.getMaxScaleOnAxis(), greaterThan(before));
+    expect((await maps.getObjects(key)).length, 1);
+    // Ordinary editing still works after both fingers leave.
+    await tester.drag(
+      tile,
+      Offset(72 * transform.value.getMaxScaleOnAxis(), 0),
+    );
+    await tester.pumpAndSettle();
+    expect((await maps.getObjects(key)).single.x, 4);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
       'expands a store, navigates without placing and edits beyond the old bounds',
       (tester) async {
     tester.view.physicalSize = const Size(400, 800);

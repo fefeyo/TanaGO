@@ -28,6 +28,8 @@ class _ShoppingItemDialog extends ConsumerStatefulWidget {
 class _ShoppingItemDialogState extends ConsumerState<_ShoppingItemDialog> {
   late final _name = TextEditingController(text: widget.item?.name);
   late String? _categoryId = widget.item?.categoryId;
+  late ShoppingPriority _priority =
+      widget.item?.priority ?? ShoppingPriority.normal;
   final _form = GlobalKey<FormState>();
   bool _saving = false;
   String? _error;
@@ -50,6 +52,7 @@ class _ShoppingItemDialogState extends ConsumerState<_ShoppingItemDialog> {
         await controller.add(
           _name.text,
           categoryId: _categoryId,
+          priority: _priority,
           autoClassify: false,
         );
       } else {
@@ -57,6 +60,7 @@ class _ShoppingItemDialogState extends ConsumerState<_ShoppingItemDialog> {
           widget.item!.id,
           name: _name.text,
           categoryId: _categoryId,
+          priority: _priority,
         );
       }
       if (mounted) Navigator.pop(context);
@@ -123,6 +127,23 @@ class _ShoppingItemDialogState extends ConsumerState<_ShoppingItemDialog> {
                     ? null
                     : (value) => setState(
                           () => _categoryId = value == '' ? null : value,
+                        ),
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<ShoppingPriority>(
+                initialValue: _priority,
+                decoration: const InputDecoration(labelText: '優先度'),
+                items: [
+                  for (final priority in ShoppingPriority.values)
+                    DropdownMenuItem(
+                      value: priority,
+                      child: Text(priority.label),
+                    ),
+                ],
+                onChanged: _saving
+                    ? null
+                    : (value) => setState(
+                          () => _priority = value ?? ShoppingPriority.normal,
                         ),
               ),
               if (suggestion != null &&

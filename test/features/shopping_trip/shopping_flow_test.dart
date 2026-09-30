@@ -118,6 +118,55 @@ class FailingCompletionRepository extends InMemoryShoppingListRepository {
 }
 
 void main() {
+  testWidgets(
+      'priority persists through create and edit, and warning opens category assignment',
+      (tester) async {
+    final f = FlowFixture();
+    await f.mount(tester);
+    await tester.tap(find.text('登録'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextFormField, '商品名'), '必要なもの');
+    await tester
+        .ensureVisible(find.byType(DropdownButtonFormField<ShoppingPriority>));
+    await tester.tap(find.byType(DropdownButtonFormField<ShoppingPriority>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('高').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+    var added =
+        (await f.items.getItems(f.hid)).singleWhere((i) => i.name == '必要なもの');
+    expect(added.priority, ShoppingPriority.high);
+    expect(added.categoryId, isNull);
+    await tester.scrollUntilVisible(
+      find.text('カテゴリを設定'),
+      150,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('カテゴリを設定'));
+    await tester.pumpAndSettle();
+    expect(find.text('買いたいものを編集'), findsOneWidget);
+    expect(find.text('高'), findsOneWidget);
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('野菜・果物').last);
+    await tester.pumpAndSettle();
+    await tester
+        .ensureVisible(find.byType(DropdownButtonFormField<ShoppingPriority>));
+    await tester.tap(find.byType(DropdownButtonFormField<ShoppingPriority>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('低').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+    added =
+        (await f.items.getItems(f.hid)).singleWhere((i) => i.id == added.id);
+    expect(added.priority, ShoppingPriority.low);
+    expect(added.categoryId, 'produce');
+    expect(find.text('カテゴリを設定'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('all main screens keep content clear of system and cutout insets',
       (tester) async {
     final f = FlowFixture();
@@ -206,7 +255,7 @@ void main() {
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
     expect(find.text('名前を設定'), findsNothing);
-    expect(find.text('乳製品・卵 ・ たろうが登録'), findsOneWidget);
+    expect(find.text('たろうが登録'), findsOneWidget);
     await tester.tap(find.byTooltip('わが家'));
     await tester.pumpAndSettle();
     expect(find.text('自分の名前を変更'), findsOneWidget);
@@ -357,7 +406,8 @@ void main() {
         (await f.items.getItems(f.hid)).singleWhere((i) => i.name == 'プロテイン');
     final customId = added.categoryId;
     expect(customId, startsWith('custom_'));
-    expect(find.text('健康食品 ・ ゆうが登録'), findsOneWidget);
+    expect(find.text('健康食品'), findsOneWidget);
+    expect(find.text('ゆうが登録'), findsWidgets);
     await tester.tap(find.byTooltip('店舗を管理'));
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('店内マップを編集'));
@@ -413,7 +463,7 @@ void main() {
     expect(find.text('あき'), findsOneWidget);
     await tester.pageBack();
     await tester.pumpAndSettle();
-    expect(find.text('未分類 ・ ゆうたが登録'), findsOneWidget);
+    expect(find.text('カテゴリを設定'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

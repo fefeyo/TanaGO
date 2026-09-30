@@ -78,6 +78,7 @@ class FirestoreShoppingListRepository implements ShoppingListRepository {
       addedByUid: data['addedByUid'] as String? ?? '',
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       categoryId: data['categoryId'] as String?,
+      priority: ShoppingPriority.fromValue(data['priority']),
       isPurchased: data['isPurchased'] as bool? ?? false,
       purchasedByUid: data['purchasedByUid'] as String?,
       purchasedAt: (data['purchasedAt'] as Timestamp?)?.toDate(),
@@ -90,6 +91,7 @@ class FirestoreShoppingListRepository implements ShoppingListRepository {
       'addedByUid': item.addedByUid,
       'createdAt': Timestamp.fromDate(item.createdAt),
       'categoryId': item.categoryId,
+      'priority': item.priority.name,
       'isPurchased': item.isPurchased,
       'purchasedByUid': item.purchasedByUid,
       'purchasedAt': item.purchasedAt == null

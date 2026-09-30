@@ -1,4 +1,5 @@
 import 'package:flutter/gestures.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../domain/map_object.dart';
@@ -19,6 +20,7 @@ class DraggableMapObject extends StatefulWidget {
     required this.onTap,
     required this.onLongPress,
     required this.child,
+    this.pinchGuard,
   });
 
   final MapObject object;
@@ -31,6 +33,7 @@ class DraggableMapObject extends StatefulWidget {
   final VoidCallback onTap;
   final VoidCallback onLongPress;
   final Widget child;
+  final ValueListenable<bool>? pinchGuard;
 
   @override
   State<DraggableMapObject> createState() => _DraggableMapObjectState();
@@ -46,6 +49,23 @@ class _DraggableMapObjectState extends State<DraggableMapObject> {
   bool _saving = false;
   Future<void> _saves = Future.value();
 
+  bool get _pinching => widget.pinchGuard?.value ?? false;
+  void _pinchChanged() {
+    if (_pinching) _cancel();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    widget.pinchGuard?.addListener(_pinchChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.pinchGuard?.removeListener(_pinchChanged);
+    super.dispose();
+  }
+
   Offset get _remote =>
       Offset(widget.object.x.toDouble(), widget.object.y.toDouble());
   Offset get _position => _preview ?? _remote;
@@ -53,6 +73,10 @@ class _DraggableMapObjectState extends State<DraggableMapObject> {
   @override
   void didUpdateWidget(covariant DraggableMapObject oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.pinchGuard != oldWidget.pinchGuard) {
+      oldWidget.pinchGuard?.removeListener(_pinchChanged);
+      widget.pinchGuard?.addListener(_pinchChanged);
+    }
     if (!_saving && _pointerOrigin == null && _preview == _remote) {
       _preview = null;
     }
@@ -75,6 +99,10 @@ class _DraggableMapObjectState extends State<DraggableMapObject> {
   }
 
   void _finish() {
+    if (_pinching) {
+      _cancel();
+      return;
+    }
     if (_dragOrigin == null) return;
     final target = _clamp(
       Offset(_position.dx.roundToDouble(), _position.dy.roundToDouble()),
@@ -134,11 +162,20 @@ class _DraggableMapObjectState extends State<DraggableMapObject> {
             key: ValueKey('map-object-${widget.object.id}'),
             behavior: HitTestBehavior.opaque,
             dragStartBehavior: DragStartBehavior.down,
-            onTap: widget.enabled ? widget.onTap : null,
-            onLongPress: widget.enabled ? widget.onLongPress : null,
+            onTap: widget.enabled
+                ? () {
+                    if (!_pinching) widget.onTap();
+                  }
+                : null,
+            onLongPress: widget.enabled
+                ? () {
+                    if (!_pinching) widget.onLongPress();
+                  }
+                : null,
             onPanStart: !widget.enabled
                 ? null
                 : (details) {
+                    if (_pinching) return;
                     _beforeDrag = _preview;
                     _dragOrigin = _position;
                     _pointerOrigin = details.globalPosition;
@@ -147,7 +184,7 @@ class _DraggableMapObjectState extends State<DraggableMapObject> {
             onPanUpdate: !widget.enabled
                 ? null
                 : (details) {
-                    if (_pointerOrigin == null) return;
+                    if (_pinching || _pointerOrigin == null) return;
                     setState(
                       () => _preview = _clamp(
                         _dragOrigin! +

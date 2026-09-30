@@ -13,6 +13,36 @@ import 'package:tanago/src/features/stores/data/firestore_store_repository.dart'
 import 'package:tanago/src/features/stores/domain/store.dart';
 
 void main() {
+  test('priority supports legacy documents and survives unrelated updates',
+      () async {
+    final db = FakeFirebaseFirestore();
+    final repository = FirestoreShoppingListRepository(db);
+    final legacy = ShoppingItem(
+      id: 'legacy',
+      name: '牛乳',
+      addedByUid: 'u',
+      createdAt: DateTime(2026),
+    );
+    await repository.addItem('h', legacy);
+    final doc = db.doc('households/h/shoppingLists/active/items/legacy');
+    await doc.update({'priority': FieldValue.delete()});
+    expect(
+      (await repository.getItems('h')).single.priority,
+      ShoppingPriority.normal,
+    );
+    await repository.updateItem(
+      'h',
+      'legacy',
+      (i) => i.copyWith(priority: ShoppingPriority.high),
+    );
+    expect((await doc.get()).data()!['priority'], 'high');
+    await repository.updateItem('h', 'legacy', (i) => i.copyWith(name: '牛乳2本'));
+    expect(
+      (await repository.getItems('h')).single.priority,
+      ShoppingPriority.high,
+    );
+  });
+
   test(
       'custom category names stay shared, rename preserves IDs and duplicates are rejected',
       () async {

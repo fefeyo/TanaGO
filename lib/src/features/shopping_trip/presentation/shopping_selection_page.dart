@@ -7,6 +7,7 @@ import '../../map_editor/domain/store_map_key.dart';
 import '../../map_editor/presentation/map_editor_controller.dart';
 import '../../product_categories/presentation/category_controller.dart';
 import '../../shopping_list/presentation/shopping_list_controller.dart';
+import '../../shopping_list/domain/shopping_item.dart';
 import '../../stores/presentation/store_controller.dart';
 import 'shopping_trip_controller.dart';
 
@@ -97,6 +98,10 @@ class ShoppingSelectionPage extends ConsumerWidget {
                                     CheckboxListTile(
                                       key: ValueKey('select-${item.id}'),
                                       title: Text(item.name),
+                                      subtitle: item.priority ==
+                                              ShoppingPriority.normal
+                                          ? null
+                                          : Text('優先度：${item.priority.label}'),
                                       value: trip.selected.contains(item.id),
                                       onChanged: (value) => ref
                                           .read(

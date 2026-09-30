@@ -48,6 +48,7 @@ class ShoppingListController {
     String name, {
     String? categoryId,
     bool autoClassify = true,
+    ShoppingPriority priority = ShoppingPriority.normal,
   }) async {
     final trimmed = name.trim();
     if (trimmed.isEmpty) {
@@ -61,6 +62,7 @@ class ShoppingListController {
       ShoppingItem(
         id: _uuid.v4(),
         name: trimmed,
+        priority: priority,
         addedByUid: user.uid,
         createdAt: DateTime.now(),
         categoryId: categoryId ??
@@ -69,7 +71,12 @@ class ShoppingListController {
     );
   }
 
-  Future<void> edit(String id, {required String name, String? categoryId}) {
+  Future<void> edit(
+    String id, {
+    required String name,
+    String? categoryId,
+    ShoppingPriority? priority,
+  }) {
     final trimmed = name.trim();
     if (trimmed.isEmpty || trimmed.length > 200) {
       throw ArgumentError('商品名は1〜200文字で入力してください');
@@ -81,6 +88,7 @@ class ShoppingListController {
         name: trimmed,
         categoryId: categoryId,
         clearCategory: categoryId == null,
+        priority: priority,
       ),
     );
   }

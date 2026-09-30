@@ -228,3 +228,21 @@ test('members can rename only themselves without changing roles or membership', 
   await assertSucceeds(setDoc(doc(db('owner'), 'households/home/shoppingLists/active/items/i'), item()));
   await assertSucceeds(deleteDoc(doc(db('guest'), 'households/home/shoppingLists/active/items/i')));
 });
+
+
+test('priority accepts legacy and supported values but rejects invalid and outsider writes', async () => {
+  await create();
+  await join();
+  const path = 'households/home/shoppingLists/active/items/priority';
+  const ref = doc(db('owner'), path);
+  await assertSucceeds(setDoc(ref, item()));
+  for (const priority of ['high', 'normal', 'low']) {
+    await assertSucceeds(updateDoc(doc(db('guest'), path), { priority }));
+    assert.equal((await getDoc(ref)).data().priority, priority);
+  }
+  for (const priority of ['urgent', '', null, 1, true]) {
+    await assertFails(updateDoc(ref, { priority }));
+  }
+  await assertFails(updateDoc(doc(db('outsider'), path), { priority: 'high' }));
+  await assertSucceeds(setDoc(doc(db('owner'), path + 'new'), { ...item(), priority: 'high' }));
+});
