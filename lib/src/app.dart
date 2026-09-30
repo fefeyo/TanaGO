@@ -99,23 +99,25 @@ class _HouseholdGate extends ConsumerWidget {
           skipLoadingOnRefresh: false,
           skipLoadingOnReload: false,
           loading: () => const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
+            body: SafeArea(child: Center(child: CircularProgressIndicator())),
           ),
           error: (error, stackTrace) => Scaffold(
-            body: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('世帯情報を読み込めませんでした: $error'),
-                  FilledButton(
-                    onPressed: () {
-                      ref.invalidate(authBootstrapProvider);
-                      ref.invalidate(authUserProvider);
-                      ref.invalidate(householdProvider);
-                    },
-                    child: const Text('再試行'),
-                  ),
-                ],
+            body: SafeArea(
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('世帯情報を読み込めませんでした: $error'),
+                    FilledButton(
+                      onPressed: () {
+                        ref.invalidate(authBootstrapProvider);
+                        ref.invalidate(authUserProvider);
+                        ref.invalidate(householdProvider);
+                      },
+                      child: const Text('再試行'),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

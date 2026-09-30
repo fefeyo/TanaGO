@@ -16,7 +16,9 @@ class HouseholdPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final household = ref.watch(householdProvider).valueOrNull;
     if (household == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        body: SafeArea(child: Center(child: CircularProgressIndicator())),
+      );
     }
 
     final myUid = ref.watch(authUserProvider).valueOrNull?.uid;
@@ -26,87 +28,89 @@ class HouseholdPage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(title: const Text('わが家')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          PageBanner(
-            eyebrow: '家族の共有スペース',
-            title: household.name,
-            description: '${members.length}人で共有中',
-            icon: Icons.home_outlined,
-          ),
-          const SizedBox(height: 12),
-          MyNameCard(householdId: household.id),
-          const SizedBox(height: 24),
-          Text('メンバー', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
-          for (final member in members)
-            Card(
-              child: ListTile(
-                leading: CircleAvatar(
-                  child: Text(
-                    memberName(members, member.uid).characters.first,
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            PageBanner(
+              eyebrow: '家族の共有スペース',
+              title: household.name,
+              description: '${members.length}人で共有中',
+              icon: Icons.home_outlined,
+            ),
+            const SizedBox(height: 12),
+            MyNameCard(householdId: household.id),
+            const SizedBox(height: 24),
+            Text('メンバー', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            for (final member in members)
+              Card(
+                child: ListTile(
+                  leading: CircleAvatar(
+                    child: Text(
+                      memberName(members, member.uid).characters.first,
+                    ),
                   ),
-                ),
-                title: Text(
-                  '${memberName(members, member.uid)}${member.uid == myUid ? '（自分）' : ''}',
-                ),
-                trailing: member.uid == myUid
-                    ? IconButton(
-                        tooltip: '名前を変更',
-                        icon: const Icon(Icons.edit_outlined),
-                        onPressed: () => showDialog<void>(
-                          context: context,
-                          builder: (_) => MemberNameDialog(
-                            householdId: household.id,
-                            name: hasMemberName(
-                              member.displayName,
-                              uid: member.uid,
-                            )
-                                ? member.displayName
-                                : '',
+                  title: Text(
+                    '${memberName(members, member.uid)}${member.uid == myUid ? '（自分）' : ''}',
+                  ),
+                  trailing: member.uid == myUid
+                      ? IconButton(
+                          tooltip: '名前を変更',
+                          icon: const Icon(Icons.edit_outlined),
+                          onPressed: () => showDialog<void>(
+                            context: context,
+                            builder: (_) => MemberNameDialog(
+                              householdId: household.id,
+                              name: hasMemberName(
+                                member.displayName,
+                                uid: member.uid,
+                              )
+                                  ? member.displayName
+                                  : '',
+                            ),
                           ),
-                        ),
-                      )
-                    : null,
-                subtitle: Text(
-                  member.role == HouseholdRole.owner ? 'オーナー' : 'メンバー',
+                        )
+                      : null,
+                  subtitle: Text(
+                    member.role == HouseholdRole.owner ? 'オーナー' : 'メンバー',
+                  ),
                 ),
               ),
-            ),
-          const SizedBox(height: 24),
-          Text('家族を招待', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
-          FutureBuilder<String>(
-            future: ref
-                .read(householdControllerProvider)
-                .getInviteCode(household.id),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) {
-                return const LinearProgressIndicator();
-              }
-              final code = snapshot.data!;
-              return Card(
-                child: ListTile(
-                  leading: const Icon(Icons.key_outlined),
-                  title: Text(code),
-                  subtitle: const Text('このコードを家族に共有してください'),
-                  trailing: IconButton(
-                    tooltip: 'コピー',
-                    onPressed: () async {
-                      await Clipboard.setData(ClipboardData(text: code));
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('招待コードをコピーしました')),
-                      );
-                    },
-                    icon: const Icon(Icons.copy),
+            const SizedBox(height: 24),
+            Text('家族を招待', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            FutureBuilder<String>(
+              future: ref
+                  .read(householdControllerProvider)
+                  .getInviteCode(household.id),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const LinearProgressIndicator();
+                }
+                final code = snapshot.data!;
+                return Card(
+                  child: ListTile(
+                    leading: const Icon(Icons.key_outlined),
+                    title: Text(code),
+                    subtitle: const Text('このコードを家族に共有してください'),
+                    trailing: IconButton(
+                      tooltip: 'コピー',
+                      onPressed: () async {
+                        await Clipboard.setData(ClipboardData(text: code));
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('招待コードをコピーしました')),
+                        );
+                      },
+                      icon: const Icon(Icons.copy),
+                    ),
                   ),
-                ),
-              );
-            },
-          ),
-        ],
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

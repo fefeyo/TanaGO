@@ -19,73 +19,75 @@ class StoreListPage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(title: Text(shopping ? '買い物する店舗を選ぶ' : '店舗を管理')),
-      body: storesAsync.isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : storesAsync.hasError
-              ? Center(
-                  child: TextButton(
-                    onPressed: () =>
-                        ref.invalidate(storesProvider(household.id)),
-                    child: const Text('店舗を再読み込み'),
-                  ),
-                )
-              : stores.isEmpty
-                  ? const EmptyState(
-                      icon: Icons.storefront_outlined,
-                      message: 'まだ店舗がありません。\nよく行くスーパーを登録しましょう。',
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-                      itemCount: stores.length + 1,
-                      separatorBuilder: (_, __) => const SizedBox(height: 8),
-                      itemBuilder: (context, index) {
-                        if (index == 0) {
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: PageBanner(
-                              eyebrow: shopping ? '買い物の準備' : 'いつものお店',
-                              title: shopping ? '今日はどこで買う？' : '売り場を、わが家の地図に。',
-                              description: shopping
-                                  ? 'お店を選んで、今日の買い物リストを作りましょう。'
-                                  : '${stores.length}店舗のマップを家族で共有しています。',
-                              icon: Icons.storefront_outlined,
+      body: SafeArea(
+        child: storesAsync.isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : storesAsync.hasError
+                ? Center(
+                    child: TextButton(
+                      onPressed: () =>
+                          ref.invalidate(storesProvider(household.id)),
+                      child: const Text('店舗を再読み込み'),
+                    ),
+                  )
+                : stores.isEmpty
+                    ? const EmptyState(
+                        icon: Icons.storefront_outlined,
+                        message: 'まだ店舗がありません。\nよく行くスーパーを登録しましょう。',
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+                        itemCount: stores.length + 1,
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (context, index) {
+                          if (index == 0) {
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: PageBanner(
+                                eyebrow: shopping ? '買い物の準備' : 'いつものお店',
+                                title: shopping ? '今日はどこで買う？' : '売り場を、わが家の地図に。',
+                                description: shopping
+                                    ? 'お店を選んで、今日の買い物リストを作りましょう。'
+                                    : '${stores.length}店舗のマップを家族で共有しています。',
+                                icon: Icons.storefront_outlined,
+                              ),
+                            );
+                          }
+                          final store = stores[index - 1];
+                          return Card(
+                            child: ListTile(
+                              leading: Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFE8EFE3),
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: const Icon(
+                                  Icons.storefront_outlined,
+                                  color: Color(0xFF246653),
+                                ),
+                              ),
+                              title: Text(
+                                store.name,
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                              subtitle: Text(
+                                shopping ? 'この店で買うものを選ぶ' : '店内マップと売り場を確認',
+                              ),
+                              trailing: IconButton(
+                                tooltip: '店内マップを編集',
+                                onPressed: () => context
+                                    .push('/stores/${store.id}/map/edit'),
+                                icon: const Icon(Icons.edit_outlined),
+                              ),
+                              onTap: () => context.push(
+                                '/stores/${store.id}/${shopping ? 'select' : 'map'}',
+                              ),
                             ),
                           );
-                        }
-                        final store = stores[index - 1];
-                        return Card(
-                          child: ListTile(
-                            leading: Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFE8EFE3),
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: const Icon(
-                                Icons.storefront_outlined,
-                                color: Color(0xFF246653),
-                              ),
-                            ),
-                            title: Text(
-                              store.name,
-                              style: Theme.of(context).textTheme.titleMedium,
-                            ),
-                            subtitle: Text(
-                              shopping ? 'この店で買うものを選ぶ' : '店内マップと売り場を確認',
-                            ),
-                            trailing: IconButton(
-                              tooltip: '店内マップを編集',
-                              onPressed: () =>
-                                  context.push('/stores/${store.id}/map/edit'),
-                              icon: const Icon(Icons.edit_outlined),
-                            ),
-                            onTap: () => context.push(
-                              '/stores/${store.id}/${shopping ? 'select' : 'map'}',
-                            ),
-                          ),
-                        );
-                      },
-                    ),
+                        },
+                      ),
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => showDialog<void>(
           context: context,

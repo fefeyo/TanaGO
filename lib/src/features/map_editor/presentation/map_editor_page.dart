@@ -38,7 +38,9 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
   Widget build(BuildContext context) {
     final household = ref.watch(householdProvider).valueOrNull;
     if (household == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        body: SafeArea(child: Center(child: CircularProgressIndicator())),
+      );
     }
     final mapKey = StoreMapKey(
       householdId: household.id,
@@ -57,22 +59,24 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
       final missing = storesAsync.hasValue && store == null;
       return Scaffold(
         appBar: AppBar(title: const Text('店内マップを作る')),
-        body: Center(
-          child: failed || missing
-              ? Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(missing ? '店舗が見つかりません' : 'マップを読み込めませんでした'),
-                    TextButton(
-                      onPressed: () {
-                        ref.invalidate(storesProvider(household.id));
-                        ref.invalidate(mapEditorProvider(mapKey));
-                      },
-                      child: const Text('再読み込み'),
-                    ),
-                  ],
-                )
-              : const CircularProgressIndicator(),
+        body: SafeArea(
+          child: Center(
+            child: failed || missing
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(missing ? '店舗が見つかりません' : 'マップを読み込めませんでした'),
+                      TextButton(
+                        onPressed: () {
+                          ref.invalidate(storesProvider(household.id));
+                          ref.invalidate(mapEditorProvider(mapKey));
+                        },
+                        child: const Text('再読み込み'),
+                      ),
+                    ],
+                  )
+                : const CircularProgressIndicator(),
+          ),
         ),
       );
     }
@@ -100,105 +104,108 @@ class _MapEditorPageState extends ConsumerState<MapEditorPage> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          _ObjectPalette(
-            selectedType: _selectedType,
-            onSelected: (type) => setState(() => _selectedType = type),
-          ),
-          const Divider(height: 1),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
-              children: [
-                Text('${store.mapWidth} × ${store.mapHeight} マス'),
-                const Spacer(),
-                FilterChip(
-                  label: const Text('移動・拡大'),
-                  avatar: const Icon(Icons.pan_tool_outlined, size: 18),
-                  selected: _navigate,
-                  onSelected: (value) => setState(() => _navigate = value),
-                ),
-              ],
+      body: SafeArea(
+        child: Column(
+          children: [
+            _ObjectPalette(
+              selectedType: _selectedType,
+              onSelected: (type) => setState(() => _selectedType = type),
             ),
-          ),
-          Expanded(
-            child: MapViewport(
-              columns: store.mapWidth,
-              rows: store.mapHeight,
-              navigationEnabled: _navigate,
-              builder: (transform) => Stack(
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(
                 children: [
-                  Positioned.fill(
-                    child: RepaintBoundary(
-                      child: GestureDetector(
-                        key: const ValueKey('map-grid'),
-                        behavior: HitTestBehavior.opaque,
-                        onTapUp: _navigate
-                            ? null
-                            : (details) => _save(
-                                  controller.add(
-                                    type: _selectedType,
-                                    x: (details.localPosition.dx /
-                                            MapViewport.cellSize)
-                                        .floor(),
-                                    y: (details.localPosition.dy /
-                                            MapViewport.cellSize)
-                                        .floor(),
-                                    mapWidth: store.mapWidth,
-                                    mapHeight: store.mapHeight,
+                  Text('${store.mapWidth} × ${store.mapHeight} マス'),
+                  const Spacer(),
+                  FilterChip(
+                    label: const Text('移動・拡大'),
+                    avatar: const Icon(Icons.pan_tool_outlined, size: 18),
+                    selected: _navigate,
+                    onSelected: (value) => setState(() => _navigate = value),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: MapViewport(
+                columns: store.mapWidth,
+                rows: store.mapHeight,
+                navigationEnabled: _navigate,
+                builder: (transform) => Stack(
+                  children: [
+                    Positioned.fill(
+                      child: RepaintBoundary(
+                        child: GestureDetector(
+                          key: const ValueKey('map-grid'),
+                          behavior: HitTestBehavior.opaque,
+                          onTapUp: _navigate
+                              ? null
+                              : (details) => _save(
+                                    controller.add(
+                                      type: _selectedType,
+                                      x: (details.localPosition.dx /
+                                              MapViewport.cellSize)
+                                          .floor(),
+                                      y: (details.localPosition.dy /
+                                              MapViewport.cellSize)
+                                          .floor(),
+                                      mapWidth: store.mapWidth,
+                                      mapHeight: store.mapHeight,
+                                    ),
                                   ),
-                                ),
-                        child: CustomPaint(
-                          painter: _GridPainter(
-                            columns: store.mapWidth,
-                            rows: store.mapHeight,
+                          child: CustomPaint(
+                            painter: _GridPainter(
+                              columns: store.mapWidth,
+                              rows: store.mapHeight,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                  for (final object in objects)
-                    DraggableMapObject(
-                      key: ValueKey(object.id),
-                      object: object,
-                      columns: store.mapWidth,
-                      rows: store.mapHeight,
-                      transform: transform,
-                      enabled: !_navigate,
-                      onMove: (x, y) async {
-                        final saved = await controller.move(
-                          id: object.id,
-                          x: x,
-                          y: y,
-                          mapWidth: store.mapWidth,
-                          mapHeight: store.mapHeight,
-                        );
-                        return saved == null
-                            ? null
-                            : Offset(saved.x.toDouble(), saved.y.toDouble());
-                      },
-                      onError: () =>
-                          _showSaveError('移動を保存できませんでした。通信を確認して、もう一度移動してください。'),
-                      onTap: () => _selectObject(object),
-                      onLongPress: () => _confirmDelete(object),
-                      child: _MapObjectTile(
+                    for (final object in objects)
+                      DraggableMapObject(
+                        key: ValueKey(object.id),
                         object: object,
-                        categories: categories,
-                        isSelected: object.id == _selectedObjectId,
+                        columns: store.mapWidth,
+                        rows: store.mapHeight,
+                        transform: transform,
+                        enabled: !_navigate,
+                        onMove: (x, y) async {
+                          final saved = await controller.move(
+                            id: object.id,
+                            x: x,
+                            y: y,
+                            mapWidth: store.mapWidth,
+                            mapHeight: store.mapHeight,
+                          );
+                          return saved == null
+                              ? null
+                              : Offset(saved.x.toDouble(), saved.y.toDouble());
+                        },
+                        onError: () => _showSaveError(
+                          '移動を保存できませんでした。通信を確認して、もう一度移動してください。',
+                        ),
+                        onTap: () => _selectObject(object),
+                        onLongPress: () => _confirmDelete(object),
+                        child: _MapObjectTile(
+                          object: object,
+                          categories: categories,
+                          isSelected: object.id == _selectedObjectId,
+                        ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-            child: Text(
-              _navigate ? 'スワイプで画面移動 / ピンチで拡大・縮小' : '空きマスをタップで配置 / 棚をドラッグで移動',
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: Text(
+                _navigate ? 'スワイプで画面移動 / ピンチで拡大・縮小' : '空きマスをタップで配置 / 棚をドラッグで移動',
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

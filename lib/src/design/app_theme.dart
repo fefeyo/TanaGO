@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 ThemeData buildAppTheme() {
   final scheme = ColorScheme.fromSeed(
@@ -28,6 +29,8 @@ ThemeData buildAppTheme() {
       foregroundColor: scheme.onSurface,
       surfaceTintColor: Colors.transparent,
       centerTitle: false,
+      systemOverlayStyle: SystemUiOverlayStyle.dark
+          .copyWith(statusBarColor: Colors.transparent),
       titleTextStyle: base.textTheme.titleLarge?.copyWith(
         fontWeight: FontWeight.w700,
         color: scheme.onSurface,

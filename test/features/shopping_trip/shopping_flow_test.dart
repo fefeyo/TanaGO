@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tanago/src/app.dart';
@@ -117,6 +118,47 @@ class FailingCompletionRepository extends InMemoryShoppingListRepository {
 }
 
 void main() {
+  testWidgets('all main screens keep content clear of system and cutout insets',
+      (tester) async {
+    final f = FlowFixture();
+    await f.mount(tester);
+    const insets = FakeViewPadding(top: 44, bottom: 34, left: 20, right: 20);
+    tester.view.padding = insets;
+    tester.view.viewPadding = insets;
+    addTearDown(tester.view.resetPadding);
+    addTearDown(tester.view.resetViewPadding);
+    await tester.pumpAndSettle();
+    final router = GoRouter.of(tester.element(find.byType(Scaffold)));
+    for (final path in [
+      '/',
+      '/stores',
+      '/categories',
+      '/household',
+      '/stores/s/select',
+      '/stores/s/map',
+      '/stores/s/map/edit',
+      '/stores/s/complete',
+    ]) {
+      router.go(path);
+      await tester.pumpAndSettle();
+      final scaffold = tester.widget<Scaffold>(find.byType(Scaffold));
+      expect(scaffold.body, isA<SafeArea>(), reason: path);
+      final safe = scaffold.body! as SafeArea;
+      final rect = tester.getRect(find.byWidget(safe.child));
+      expect(rect.left, greaterThanOrEqualTo(20), reason: path);
+      expect(rect.right, lessThanOrEqualTo(380), reason: path);
+      expect(rect.top, greaterThanOrEqualTo(44), reason: path);
+      expect(rect.bottom, lessThanOrEqualTo(816), reason: path);
+      if (scaffold.floatingActionButton != null) {
+        final fab =
+            tester.getRect(find.byWidget(scaffold.floatingActionButton!));
+        expect(fab.right, lessThanOrEqualTo(380), reason: path);
+        expect(fab.bottom, lessThanOrEqualTo(816), reason: path);
+      }
+      expect(tester.takeException(), isNull, reason: path);
+    }
+  });
+
   testWidgets('shopping remains usable on a compact screen with larger text',
       (tester) async {
     final f = FlowFixture();
