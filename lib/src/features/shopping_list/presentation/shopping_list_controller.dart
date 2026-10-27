@@ -19,6 +19,12 @@ final shoppingListProvider =
       ref.watch(shoppingListRepositoryProvider).watchItems(householdId),
 );
 
+final recentPurchasesProvider =
+    StreamProvider.autoDispose.family<List<PurchaseRecord>, String>(
+  (ref, hid) =>
+      ref.watch(shoppingListRepositoryProvider).watchRecentPurchases(hid),
+);
+
 final shoppingListControllerProvider =
     Provider.family<ShoppingListController, String>(
   (ref, householdId) => ShoppingListController(
@@ -47,10 +53,17 @@ class ShoppingListController {
   Future<void> add(
     String name, {
     String? categoryId,
+    String quantity = '',
+    String memo = '',
     bool autoClassify = true,
     ShoppingPriority priority = ShoppingPriority.normal,
   }) async {
     final trimmed = name.trim();
+    if (quantity.trim().length > 40 ||
+        memo.trim().length > 300 ||
+        trimmed.length > 200) {
+      throw ArgumentError('商品名200文字、数量40文字、メモ300文字以内で入力してください');
+    }
     if (trimmed.isEmpty) {
       return;
     }
@@ -62,6 +75,8 @@ class ShoppingListController {
       ShoppingItem(
         id: _uuid.v4(),
         name: trimmed,
+        quantity: quantity.trim(),
+        memo: memo.trim(),
         priority: priority,
         addedByUid: user.uid,
         createdAt: DateTime.now(),
@@ -75,9 +90,16 @@ class ShoppingListController {
     String id, {
     required String name,
     String? categoryId,
+    String quantity = '',
+    String memo = '',
     ShoppingPriority? priority,
   }) {
     final trimmed = name.trim();
+    if (quantity.trim().length > 40 ||
+        memo.trim().length > 300 ||
+        trimmed.length > 200) {
+      throw ArgumentError('商品名200文字、数量40文字、メモ300文字以内で入力してください');
+    }
     if (trimmed.isEmpty || trimmed.length > 200) {
       throw ArgumentError('商品名は1〜200文字で入力してください');
     }
@@ -86,6 +108,8 @@ class ShoppingListController {
       id,
       (item) => item.copyWith(
         name: trimmed,
+        quantity: quantity.trim(),
+        memo: memo.trim(),
         categoryId: categoryId,
         clearCategory: categoryId == null,
         priority: priority,
@@ -93,8 +117,21 @@ class ShoppingListController {
     );
   }
 
-  Future<void> complete(Iterable<String> ids) =>
-      _repository.removeItems(_householdId, ids.toSet());
+  Future<List<PurchaseRecord>> complete(
+    Iterable<String> ids, {
+    required String purchaseId,
+  }) async {
+    final user = _authRepository.currentUser ?? await _authRepository.signIn();
+    return _repository.purchaseItems(
+      _householdId,
+      ids.toSet(),
+      purchaseId: purchaseId,
+      purchasedByUid: user.uid,
+    );
+  }
+
+  Future<void> undoPurchase(List<PurchaseRecord> records) =>
+      _repository.undoPurchase(_householdId, records);
 
   Future<void> updateCategory(String id, String categoryId) {
     return _repository.updateItem(

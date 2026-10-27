@@ -187,6 +187,13 @@ class _CompactItem extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.titleSmall,
                       ),
+                      if (item.details.isNotEmpty)
+                        Text(
+                          item.details,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
                       if (item.buySoon)
                         const Text(
                           'すぐ買いたい！',

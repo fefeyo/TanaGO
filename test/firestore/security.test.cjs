@@ -246,3 +246,81 @@ test('priority accepts legacy and supported values but rejects invalid and outsi
   await assertFails(updateDoc(doc(db('outsider'), path), { priority: 'high' }));
   await assertSucceeds(setDoc(doc(db('owner'), path + 'new'), { ...item(), priority: 'high' }));
 });
+
+test('quantity and memo remain optional, bounded and editable by family', async () => {
+  await create(); await join();
+  const ref = doc(db('owner'), 'households/home/shoppingLists/active/items/detail');
+  await assertSucceeds(setDoc(ref, item()));
+  await assertSucceeds(updateDoc(doc(db('guest'), ref.path), { quantity: '2本', memo: '青いパッケージ' }));
+  await assertFails(updateDoc(ref, { quantity: 'x'.repeat(41) }));
+  await assertFails(updateDoc(ref, { memo: 'x'.repeat(301) }));
+  await assertFails(updateDoc(ref, { quantity: 2 }));
+  await assertFails(updateDoc(ref, { memo: null }));
+  await assertSucceeds(updateDoc(ref, { quantity: '', memo: '' }));
+});
+
+test('family archive and restore are atomic, immutable and preserve another author', async () => {
+  await create(); await join();
+  const owner = db('owner'), guest = db('guest');
+  const activePath = 'households/home/shoppingLists/active/items/history';
+  const historyPath = 'households/home/purchaseHistory/history';
+  const original = {...item(), quantity: '2本', memo: '指定のもの'};
+  await setDoc(doc(owner, activePath), original);
+  const purchased = {...original, purchaseId: 'operation', isPurchased: true, purchasedByUid: 'guest', purchasedAt: serverTimestamp()};
+  await assertFails(setDoc(doc(guest, historyPath), purchased));
+  const tampered = writeBatch(guest);
+  tampered.set(doc(guest, historyPath), {...purchased, name: '改変'});
+  tampered.delete(doc(guest, activePath));
+  await assertFails(tampered.commit());
+  const batch = writeBatch(guest);
+  batch.set(doc(guest, historyPath), purchased);
+  batch.delete(doc(guest, activePath));
+  await assertSucceeds(batch.commit());
+  await assertSucceeds(getDocs(query(collection(guest, 'households/home/purchaseHistory'), orderBy('purchasedAt', 'desc'))));
+  await assertFails(updateDoc(doc(guest, historyPath), {memo: '変更'}));
+  await assertFails(setDoc(doc(guest, activePath), original));
+  const wrongRestore = writeBatch(guest);
+  wrongRestore.set(doc(guest, activePath), {...original, memo: '改変'});
+  wrongRestore.delete(doc(guest, historyPath));
+  await assertFails(wrongRestore.commit());
+  for (const uid of [null, 'outsider']) {
+    await assertFails(getDoc(doc(db(uid), historyPath)));
+    await assertFails(deleteDoc(doc(db(uid), historyPath)));
+    await assertFails(setDoc(doc(db(uid), historyPath), purchased));
+  }
+  const restore = writeBatch(guest);
+  restore.set(doc(guest, activePath), original);
+  restore.delete(doc(guest, historyPath));
+  await assertSucceeds(restore.commit());
+  assert.equal((await getDoc(doc(guest, activePath))).data().addedByUid, 'owner');
+});
+
+test('eight-item purchase and undo transactions fit rule access limits with custom categories', async () => {
+  await create(); await join();
+  const client = db('guest');
+  const category = 'custom_12345678-1234-1234-1234-123456789abc';
+  await setDoc(doc(client, 'households/home/categoryCatalog/active'), {names: {[category]: '特別'}, lastEditedId: category});
+  const originals = Array.from({length: 8}, (_, i) => ({...item(), name: `商品${i}`, categoryId: category}));
+  for (let i = 0; i < 8; i++) await setDoc(doc(db('owner'), `households/home/shoppingLists/active/items/${i}`), originals[i]);
+  await assertSucceeds(runTransaction(client, async tx => {
+    const snapshots = [];
+    for (let i = 0; i < 8; i++) {
+      snapshots.push(await tx.get(doc(client, `households/home/shoppingLists/active/items/${i}`)));
+      await tx.get(doc(client, `households/home/purchaseHistory/${i}`));
+    }
+    for (let i = 0; i < 8; i++) {
+      tx.set(doc(client, `households/home/purchaseHistory/${i}`), {...snapshots[i].data(), purchaseId: 'bulk', isPurchased: true, purchasedByUid: 'guest', purchasedAt: serverTimestamp()});
+      tx.delete(snapshots[i].ref);
+    }
+  }));
+  await assertSucceeds(runTransaction(client, async tx => {
+    for (let i = 0; i < 8; i++) {
+      await tx.get(doc(client, `households/home/purchaseHistory/${i}`));
+      await tx.get(doc(client, `households/home/shoppingLists/active/items/${i}`));
+    }
+    for (let i = 0; i < 8; i++) {
+      tx.set(doc(client, `households/home/shoppingLists/active/items/${i}`), originals[i]);
+      tx.delete(doc(client, `households/home/purchaseHistory/${i}`));
+    }
+  }));
+});

@@ -108,12 +108,22 @@ class FlowFixture {
 class FailingCompletionRepository extends InMemoryShoppingListRepository {
   bool fail = true;
   @override
-  Future<void> removeItems(String hid, Set<String> ids) async {
+  Future<List<PurchaseRecord>> purchaseItems(
+    String hid,
+    Set<String> ids, {
+    required String purchaseId,
+    required String purchasedByUid,
+  }) async {
     if (fail) {
       fail = false;
       throw StateError('offline');
     }
-    await super.removeItems(hid, ids);
+    return super.purchaseItems(
+      hid,
+      ids,
+      purchaseId: purchaseId,
+      purchasedByUid: purchasedByUid,
+    );
   }
 }
 
@@ -327,10 +337,10 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('map-label-shelf')));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    await tester.ensureVisible(find.widgetWithText(CheckboxListTile, '牛乳'));
-    await tester.tap(find.widgetWithText(CheckboxListTile, '牛乳'));
+    await tester.ensureVisible(find.byKey(const ValueKey('map-check-milk')));
+    await tester.tap(find.byKey(const ValueKey('map-check-milk')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('チェックした1点の購入を完了する'));
+    await tester.tap(find.text('購入内容を確認（1点）'));
     await tester.pumpAndSettle();
     expect(find.text('購入を確定する'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -446,21 +456,22 @@ void main() {
     expect(find.text('これから買うもの'), findsOneWidget);
     expect(find.text('乳製品・卵'), findsOneWidget);
     expect(find.text('鮮魚'), findsNothing);
-    expect(find.text('鮭'), findsNothing);
+    expect(find.text('場所未登録'), findsOneWidget);
+    expect(find.text('鮭'), findsOneWidget);
     expect(find.text('精肉'), findsNothing);
     await tester.tap(find.byKey(const ValueKey('select-milk')));
     await tester.tap(find.byKey(const ValueKey('select-egg')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('2点を持って店内マップへ'));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(CheckboxListTile, '牛乳'));
+    await tester.tap(find.byKey(const ValueKey('map-check-milk')));
     await tester.pumpAndSettle();
     expect((await f.items.getItems(f.hid)).length, 3);
     expect(
       (await f.items.getItems(f.hid)).every((i) => !i.isPurchased),
       isTrue,
     );
-    await tester.tap(find.text('チェックした1点の購入を完了する'));
+    await tester.tap(find.text('購入内容を確認（1点）'));
     await tester.pumpAndSettle();
     expect(find.text('購入内容の確認'), findsOneWidget);
     expect(
@@ -494,6 +505,7 @@ void main() {
     await tester.tap(find.text('登録'));
     await tester.pumpAndSettle();
     await tester.enterText(find.widgetWithText(TextFormField, '商品名'), 'プロテイン');
+    await tester.ensureVisible(find.text('カテゴリを作成'));
     await tester.tap(find.text('カテゴリを作成'));
     await tester.pumpAndSettle();
     await tester.enterText(find.widgetWithText(TextField, 'カテゴリ名'), '健康食品');
@@ -580,21 +592,21 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('1点を持って店内マップへ'));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(CheckboxListTile, '牛乳'));
+    await tester.tap(find.byKey(const ValueKey('map-check-milk')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('チェックした1点の購入を完了する'));
+    await tester.tap(find.text('購入内容を確認（1点）'));
     await tester.pumpAndSettle();
     await tester.pageBack();
     await tester.pumpAndSettle();
     expect(
       tester
-          .widget<CheckboxListTile>(
-            find.widgetWithText(CheckboxListTile, '牛乳'),
+          .widget<Checkbox>(
+            find.byKey(const ValueKey('map-check-milk')),
           )
           .value,
       isTrue,
     );
-    await tester.tap(find.text('チェックした1点の購入を完了する'));
+    await tester.tap(find.text('購入内容を確認（1点）'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('購入を確定する'));
     await tester.pumpAndSettle();
@@ -607,8 +619,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  test(
-      'custom category is offered only in stores whose shelves reference it, and trips stay isolated',
+  test('unmapped items are selectable in every store and trips stay isolated',
       () async {
     final items = InMemoryShoppingListRepository();
     final maps = InMemoryMapRepository();
@@ -654,7 +665,10 @@ void main() {
       container.read(storeShoppingItemsProvider(a)).requireValue.single.id,
       'i',
     );
-    expect(container.read(storeShoppingItemsProvider(b)).requireValue, isEmpty);
+    expect(
+      container.read(storeShoppingItemsProvider(b)).requireValue.single.id,
+      'i',
+    );
     final trip = container.read(shoppingTripProvider(a).notifier);
     trip.check('i', true);
     expect(container.read(shoppingTripProvider(a)).checked, isEmpty);

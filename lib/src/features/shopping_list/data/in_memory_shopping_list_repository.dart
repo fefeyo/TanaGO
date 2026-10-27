@@ -39,6 +39,86 @@ class InMemoryShoppingListRepository implements ShoppingListRepository {
     _emit(householdId);
   }
 
+  final _history = <String, Map<String, PurchaseRecord>>{};
+  final _historyControllers =
+      <String, StreamController<List<PurchaseRecord>>>{};
+  StreamController<List<PurchaseRecord>> _historyController(String hid) =>
+      _historyControllers.putIfAbsent(
+        hid,
+        () => StreamController<List<PurchaseRecord>>.broadcast(),
+      );
+  List<PurchaseRecord> _recent(String hid) =>
+      (_history[hid]?.values.toList() ?? [])
+        ..sort((a, b) => b.item.purchasedAt!.compareTo(a.item.purchasedAt!));
+  @override
+  Stream<List<PurchaseRecord>> watchRecentPurchases(String householdId) async* {
+    yield _recent(householdId).take(60).toList();
+    yield* _historyController(householdId).stream;
+  }
+
+  @override
+  Future<List<PurchaseRecord>> purchaseItems(
+    String householdId,
+    Set<String> itemIds, {
+    required String purchaseId,
+    required String purchasedByUid,
+  }) async {
+    final history = _history.putIfAbsent(householdId, () => {});
+    final result = <PurchaseRecord>[];
+    for (final id in itemIds) {
+      final item = (_items[householdId] ?? [])
+          .where((item) => item.id == id)
+          .firstOrNull;
+      if (item == null) {
+        if (history[id]?.purchaseId == purchaseId) result.add(history[id]!);
+        continue;
+      }
+      if (history.containsKey(id)) throw StateError('Already archived');
+      final record = PurchaseRecord(
+        item: item.copyWith(
+          isPurchased: true,
+          purchasedByUid: purchasedByUid,
+          purchasedAt: DateTime.now(),
+        ),
+        purchaseId: purchaseId,
+      );
+      history[id] = record;
+      result.add(record);
+    }
+    _items[householdId] = [...?_items[householdId]]
+        .where((item) => !itemIds.contains(item.id))
+        .toList();
+    _emit(householdId);
+    _historyController(householdId).add(_recent(householdId).take(60).toList());
+    return result;
+  }
+
+  @override
+  Future<void> undoPurchase(
+    String householdId,
+    List<PurchaseRecord> records,
+  ) async {
+    final history = _history[householdId] ?? {};
+    final active = [...?_items[householdId]];
+    for (final record in records) {
+      final stored = history[record.item.id];
+      if (stored?.purchaseId != record.purchaseId) continue;
+      if (!active.any((item) => item.id == record.item.id)) {
+        active.add(
+          stored!.item.copyWith(
+            isPurchased: false,
+            clearPurchasedByUid: true,
+            clearPurchasedAt: true,
+          ),
+        );
+      }
+      history.remove(record.item.id);
+    }
+    _items[householdId] = active;
+    _emit(householdId);
+    _historyController(householdId).add(_recent(householdId).take(60).toList());
+  }
+
   @override
   Future<void> removeItems(String householdId, Set<String> itemIds) async {
     for (final id in itemIds) {

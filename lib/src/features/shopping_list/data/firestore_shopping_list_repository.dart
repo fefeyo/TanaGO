@@ -51,6 +51,131 @@ class FirestoreShoppingListRepository implements ShoppingListRepository {
     });
   }
 
+  CollectionReference<Map<String, dynamic>> _history(String householdId) =>
+      _firestore
+          .collection('households')
+          .doc(householdId)
+          .collection('purchaseHistory');
+
+  @override
+  Stream<List<PurchaseRecord>> watchRecentPurchases(String householdId) =>
+      _history(householdId)
+          .orderBy('purchasedAt', descending: true)
+          .limit(60)
+          .snapshots()
+          .map(
+            (snapshot) => snapshot.docs
+                .map(
+                  (doc) => PurchaseRecord(
+                    item: _fromDocument(doc),
+                    purchaseId: doc.data()['purchaseId'] as String,
+                  ),
+                )
+                .toList(),
+          );
+
+  @override
+  Future<List<PurchaseRecord>> purchaseItems(
+    String householdId,
+    Set<String> itemIds, {
+    required String purchaseId,
+    required String purchasedByUid,
+  }) async {
+    final records = <PurchaseRecord>[];
+    final ids = itemIds.toList();
+    // Small transactions stay within the rules' document-access budget.
+    // Reusing purchaseId makes retries after a partially completed run safe.
+    for (var offset = 0; offset < ids.length; offset += 8) {
+      final chunk = ids.skip(offset).take(8).toList();
+      records.addAll(
+        await _firestore.runTransaction((transaction) async {
+          final active = <DocumentSnapshot<Map<String, dynamic>>>[];
+          final history = <DocumentSnapshot<Map<String, dynamic>>>[];
+          for (final id in chunk) {
+            active.add(await transaction.get(_items(householdId).doc(id)));
+            history.add(await transaction.get(_history(householdId).doc(id)));
+          }
+          final result = <PurchaseRecord>[];
+          for (var i = 0; i < chunk.length; i++) {
+            if (!active[i].exists) {
+              if (history[i].data()?['purchaseId'] == purchaseId) {
+                result.add(
+                  PurchaseRecord(
+                    item: _fromDocument(history[i]),
+                    purchaseId: purchaseId,
+                  ),
+                );
+              }
+              continue;
+            }
+            if (history[i].exists) {
+              throw StateError(
+                'An existing purchase must be restored before repurchase.',
+              );
+            }
+            final item = _fromDocument(active[i]).copyWith(
+              isPurchased: true,
+              purchasedByUid: purchasedByUid,
+              purchasedAt: DateTime.now(),
+            );
+            // Preserve missing optional fields in older documents exactly.
+            transaction.set(_history(householdId).doc(chunk[i]), {
+              ...active[i].data()!,
+              'purchaseId': purchaseId,
+              'isPurchased': true,
+              'purchasedByUid': purchasedByUid,
+              'purchasedAt': FieldValue.serverTimestamp(),
+            });
+            transaction.delete(active[i].reference);
+            result.add(PurchaseRecord(item: item, purchaseId: purchaseId));
+          }
+          return result;
+        }),
+      );
+    }
+    return records;
+  }
+
+  @override
+  Future<void> undoPurchase(
+    String householdId,
+    List<PurchaseRecord> records,
+  ) async {
+    for (var offset = 0; offset < records.length; offset += 8) {
+      final chunk = records.skip(offset).take(8).toList();
+      await _firestore.runTransaction((transaction) async {
+        final history = <DocumentSnapshot<Map<String, dynamic>>>[];
+        final active = <DocumentSnapshot<Map<String, dynamic>>>[];
+        for (final record in chunk) {
+          history.add(
+            await transaction.get(_history(householdId).doc(record.item.id)),
+          );
+          active.add(
+            await transaction.get(_items(householdId).doc(record.item.id)),
+          );
+        }
+        for (var i = 0; i < chunk.length; i++) {
+          final data = history[i].data();
+          if (data == null || data['purchaseId'] != chunk[i].purchaseId) {
+            continue;
+          }
+          // Never overwrite a product that another family member has edited.
+          if (!active[i].exists) {
+            final restored = Map<String, dynamic>.from(data)
+              ..remove('purchaseId');
+            restored.addAll({
+              'isPurchased': false,
+              'purchasedByUid': null,
+              'purchasedAt': null,
+            });
+            transaction.set(active[i].reference, restored);
+          }
+          transaction.delete(history[i].reference);
+        }
+      });
+    }
+  }
+
   @override
   Future<void> removeItems(String householdId, Set<String> itemIds) async {
     final ids = itemIds.toList();
@@ -78,6 +203,8 @@ class FirestoreShoppingListRepository implements ShoppingListRepository {
       addedByUid: data['addedByUid'] as String? ?? '',
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       categoryId: data['categoryId'] as String?,
+      quantity: data['quantity'] as String? ?? '',
+      memo: data['memo'] as String? ?? '',
       priority: ShoppingPriority.fromValue(data['priority']),
       isPurchased: data['isPurchased'] as bool? ?? false,
       purchasedByUid: data['purchasedByUid'] as String?,
@@ -88,6 +215,8 @@ class FirestoreShoppingListRepository implements ShoppingListRepository {
   Map<String, dynamic> _toMap(ShoppingItem item) {
     return {
       'name': item.name,
+      'quantity': item.quantity,
+      'memo': item.memo,
       'addedByUid': item.addedByUid,
       'createdAt': Timestamp.fromDate(item.createdAt),
       'categoryId': item.categoryId,

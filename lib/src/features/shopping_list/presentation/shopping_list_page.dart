@@ -6,6 +6,7 @@ import '../../household/presentation/my_name_card.dart';
 import '../../household/presentation/household_controller.dart';
 import '../../product_categories/presentation/category_controller.dart';
 import 'shopping_item_dialog.dart';
+import 'recent_purchases_sheet.dart';
 import 'category_shopping_list.dart';
 import 'shopping_list_controller.dart';
 
@@ -61,6 +62,14 @@ class ShoppingListPage extends ConsumerWidget {
                   icon: const Icon(Icons.add, size: 20),
                   label: const Text('登録'),
                 ),
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () => showRecentPurchases(context, household.id),
+                icon: const Icon(Icons.history, size: 20),
+                label: const Text('最近買ったものから追加'),
               ),
             ),
             Expanded(

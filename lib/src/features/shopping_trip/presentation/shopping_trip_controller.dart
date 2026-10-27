@@ -1,26 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../map_editor/domain/map_object.dart';
 import '../../map_editor/domain/store_map_key.dart';
-import '../../map_editor/presentation/map_editor_controller.dart';
 import '../../shopping_list/domain/shopping_item.dart';
 import '../../shopping_list/presentation/shopping_list_controller.dart';
 
 final storeShoppingItemsProvider = Provider.autoDispose
     .family<AsyncValue<List<ShoppingItem>>, StoreMapKey>((ref, key) {
   final items = ref.watch(shoppingListProvider(key.householdId));
-  final objects = ref.watch(mapEditorProvider(key));
-  if (items.hasError) return AsyncError(items.error!, items.stackTrace!);
-  if (objects.hasError) return AsyncError(objects.error!, objects.stackTrace!);
-  if (!items.hasValue || !objects.hasValue) return const AsyncLoading();
-  final categoryIds = objects.requireValue
-      .where((o) => o.type == MapObjectType.shelf)
-      .expand((o) => o.categoryIds)
-      .toSet();
-  return AsyncData(
-    items.requireValue
-        .where((i) => !i.isPurchased && categoryIds.contains(i.categoryId))
-        .toList(),
-  );
+  return items
+      .whenData((values) => values.where((i) => !i.isPurchased).toList());
 });
 
 class ShoppingTrip {

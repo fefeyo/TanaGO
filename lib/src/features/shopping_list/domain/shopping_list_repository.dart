@@ -11,6 +11,14 @@ abstract interface class ShoppingListRepository {
     String itemId,
     ShoppingItem Function(ShoppingItem current) update,
   );
+  Stream<List<PurchaseRecord>> watchRecentPurchases(String householdId);
+  Future<List<PurchaseRecord>> purchaseItems(
+    String householdId,
+    Set<String> itemIds, {
+    required String purchaseId,
+    required String purchasedByUid,
+  });
+  Future<void> undoPurchase(String householdId, List<PurchaseRecord> records);
   Future<void> removeItems(String householdId, Set<String> itemIds);
   Future<void> removeItem(String householdId, String itemId);
 }

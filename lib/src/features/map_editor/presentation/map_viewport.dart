@@ -1,5 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'dart:math' as math;
+
+/// Requests a view change without coupling the shopping list to map gestures.
+class MapViewportController extends ChangeNotifier {
+  Rect? _target;
+  void focus(Rect target) {
+    _target = target;
+    notifyListeners();
+  }
+}
 
 /// A fixed cell size keeps large maps usable; zoom changes the view, not data.
 class MapViewport extends StatefulWidget {
@@ -9,12 +19,14 @@ class MapViewport extends StatefulWidget {
     required this.rows,
     required this.builder,
     this.editing = false,
+    this.controller,
   });
 
   static const cellSize = 36.0;
   final int columns;
   final int rows;
   final bool editing;
+  final MapViewportController? controller;
   final Widget Function(
     TransformationController transform,
     ValueListenable<bool> pinchGuard,
@@ -24,13 +36,62 @@ class MapViewport extends StatefulWidget {
   State<MapViewport> createState() => _MapViewportState();
 }
 
-class _MapViewportState extends State<MapViewport> {
+class _MapViewportState extends State<MapViewport>
+    with SingleTickerProviderStateMixin {
   final _transform = TransformationController();
   final _pinchGuard = ValueNotifier(false);
   final _pointers = <int, Offset>{};
   double? _pinchDistance;
   double _pinchScale = 1;
   Offset _pinchScene = Offset.zero;
+
+  Size _size = Size.zero;
+  late final _animation = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 260),
+  );
+  Animation<Matrix4>? _movement;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller?.addListener(_focus);
+    _animation.addListener(() {
+      if (_movement != null) _transform.value = _movement!.value;
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant MapViewport oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.controller != oldWidget.controller) {
+      oldWidget.controller?.removeListener(_focus);
+      widget.controller?.addListener(_focus);
+    }
+  }
+
+  void _focus() {
+    final target = widget.controller?._target;
+    if (target == null || _size.isEmpty) return;
+    final scale = math
+        .min(
+          (_size.width - 48) / target.width,
+          (_size.height - 48) / target.height,
+        )
+        .clamp(0.02, 2.0);
+    final end = Matrix4.identity()
+      ..translateByDouble(
+        _size.width / 2 - target.center.dx * scale,
+        _size.height / 2 - target.center.dy * scale,
+        0,
+        1,
+      )
+      ..scaleByDouble(scale, scale, scale, 1);
+    _movement = Matrix4Tween(begin: _transform.value.clone(), end: end)
+        .chain(CurveTween(curve: Curves.easeOutCubic))
+        .animate(_animation);
+    _animation.forward(from: 0);
+  }
 
   // Raw two-finger input remains available even after a shelf's one-finger
   // drag wins the gesture arena. Only edit mode uses this path; browsing uses
@@ -48,6 +109,7 @@ class _MapViewportState extends State<MapViewport> {
   }
 
   void _pointerDown(PointerDownEvent event) {
+    _animation.stop();
     if (!widget.editing) return;
     _pointers[event.pointer] = event.localPosition;
     _beginPinch();
@@ -87,6 +149,8 @@ class _MapViewportState extends State<MapViewport> {
 
   @override
   void dispose() {
+    widget.controller?.removeListener(_focus);
+    _animation.dispose();
     _pinchGuard.dispose();
     _transform.dispose();
     super.dispose();
@@ -97,6 +161,7 @@ class _MapViewportState extends State<MapViewport> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = constraints.biggest;
+        _size = size;
         return Stack(
           children: [
             Positioned.fill(
@@ -135,6 +200,7 @@ class _MapViewportState extends State<MapViewport> {
                     IconButton(
                       tooltip: '全体を表示',
                       onPressed: () {
+                        _animation.stop();
                         final scale = ((size.width - 24) /
                                 (widget.columns * MapViewport.cellSize))
                             .clamp(0.02, 1.0);

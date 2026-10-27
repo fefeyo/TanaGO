@@ -27,6 +27,8 @@ class _ShoppingItemDialog extends ConsumerStatefulWidget {
 
 class _ShoppingItemDialogState extends ConsumerState<_ShoppingItemDialog> {
   late final _name = TextEditingController(text: widget.item?.name);
+  late final _quantity = TextEditingController(text: widget.item?.quantity);
+  late final _memo = TextEditingController(text: widget.item?.memo);
   late String? _categoryId = widget.item?.categoryId;
   late ShoppingPriority _priority =
       widget.item?.priority ?? ShoppingPriority.normal;
@@ -36,6 +38,8 @@ class _ShoppingItemDialogState extends ConsumerState<_ShoppingItemDialog> {
   @override
   void dispose() {
     _name.dispose();
+    _quantity.dispose();
+    _memo.dispose();
     super.dispose();
   }
 
@@ -52,6 +56,8 @@ class _ShoppingItemDialogState extends ConsumerState<_ShoppingItemDialog> {
         await controller.add(
           _name.text,
           categoryId: _categoryId,
+          quantity: _quantity.text,
+          memo: _memo.text,
           priority: _priority,
           autoClassify: false,
         );
@@ -60,6 +66,8 @@ class _ShoppingItemDialogState extends ConsumerState<_ShoppingItemDialog> {
           widget.item!.id,
           name: _name.text,
           categoryId: _categoryId,
+          quantity: _quantity.text,
+          memo: _memo.text,
           priority: _priority,
         );
       }
@@ -168,6 +176,28 @@ class _ShoppingItemDialogState extends ConsumerState<_ShoppingItemDialog> {
                       },
                 icon: const Icon(Icons.add),
                 label: const Text('カテゴリを作成'),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _quantity,
+                enabled: !_saving,
+                maxLength: 40,
+                decoration: const InputDecoration(
+                  labelText: '数量（任意）',
+                  hintText: '例：2本、1袋',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _memo,
+                enabled: !_saving,
+                maxLength: 300,
+                minLines: 1,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'メモ（任意）',
+                  hintText: '例：青いパッケージ、なければ別商品OK',
+                ),
               ),
               if (_error != null)
                 Text(

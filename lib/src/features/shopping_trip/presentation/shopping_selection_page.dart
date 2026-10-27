@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../household/presentation/household_controller.dart';
 import '../../map_editor/domain/store_map_key.dart';
+import '../../map_editor/domain/map_object.dart';
+import '../../shopping_list/domain/shopping_item.dart';
 import '../../map_editor/presentation/map_editor_controller.dart';
 import '../../product_categories/presentation/category_controller.dart';
 import '../../shopping_list/presentation/shopping_list_controller.dart';
@@ -26,15 +28,28 @@ class ShoppingSelectionPage extends ConsumerWidget {
         ?.where((s) => s.id == storeId)
         .firstOrNull;
     final items = eligible.valueOrNull ?? [];
-    final groups = items.map((i) => i.categoryId).toSet();
+    final map = ref.watch(mapEditorProvider(key));
+    final mapped = (map.valueOrNull ?? <MapObject>[])
+        .where((o) => o.type == MapObjectType.shelf)
+        .expand((o) => o.categoryIds)
+        .toSet();
+    final groups = <String?, List<ShoppingItem>>{};
+    for (final item in items) {
+      final group = mapped.contains(item.categoryId) ? item.categoryId : null;
+      (groups[group] ??= []).add(item);
+    }
+    final order = [
+      for (final c in categories)
+        if (groups.containsKey(c.id)) c.id,
+      for (final id in groups.keys)
+        if (id != null && !categories.any((c) => c.id == id)) id,
+      if (groups.containsKey(null)) null,
+    ];
+    for (final values in groups.values) {
+      values.sort((a, b) => (a.buySoon ? 0 : 1).compareTo(b.buySoon ? 0 : 1));
+    }
     final selectedCount =
         items.where((i) => trip.selected.contains(i.id)).length;
-    final allCount = ref
-            .watch(shoppingListProvider(hid))
-            .valueOrNull
-            ?.where((i) => !i.isPurchased)
-            .length ??
-        0;
     return Scaffold(
       appBar: AppBar(title: const Text('これから買うもの')),
       body: SafeArea(
@@ -46,10 +61,15 @@ class ShoppingSelectionPage extends ConsumerWidget {
                 eyebrow: '今日の買い物 / $selectedCount点を選択中',
                 title: store?.name ?? '選択した店舗',
                 icon: Icons.shopping_basket_outlined,
-                description: 'この店の棚に設定されたカテゴリから選びます。'
-                    '${allCount > items.length && eligible.hasValue ? '\n未分類・この店に未設定の商品 ${allCount - items.length}点は登録一覧に残ります。' : ''}',
+                description: '売り場ごとに、今回買うものを選びます。場所未登録の商品も選べます。',
               ),
             ),
+            if (map.hasError)
+              TextButton(
+                onPressed: () => ref.invalidate(mapEditorProvider(key)),
+                child: const Text('売り場情報を再読み込み（商品は選べます）'),
+              ),
+            if (map.isLoading) const LinearProgressIndicator(),
             Expanded(
               child: eligible.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
@@ -67,11 +87,10 @@ class ShoppingSelectionPage extends ConsumerWidget {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Text('この店で選べる商品はありません。'),
+                            const Text('買いたいものがまだ登録されていません。'),
                             TextButton(
-                              onPressed: () =>
-                                  context.push('/stores/$storeId/map/edit'),
-                              child: const Text('棚のカテゴリを設定する'),
+                              onPressed: () => context.go('/'),
+                              child: const Text('買いたいものを登録する'),
                             ),
                           ],
                         ),
@@ -79,27 +98,29 @@ class ShoppingSelectionPage extends ConsumerWidget {
                     : ListView(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         children: [
-                          for (final categoryId in groups)
+                          for (final categoryId in order)
                             Card(
                               child: ExpansionTile(
                                 leading: CategorySymbol(categoryId: categoryId),
                                 key:
                                     PageStorageKey('trip-$storeId-$categoryId'),
                                 initiallyExpanded: true,
-                                title:
-                                    Text(categoryName(categories, categoryId)),
+                                title: Text(
+                                  categoryId == null
+                                      ? '場所未登録'
+                                      : categoryName(categories, categoryId),
+                                ),
                                 subtitle: Text(
-                                  '${items.where((i) => i.categoryId == categoryId).length}点',
+                                  '${groups[categoryId]!.length}点${categoryId == null ? '・売り場がまだわからない商品' : ''}',
                                 ),
                                 children: [
-                                  for (final item in items
-                                      .where((i) => i.categoryId == categoryId))
+                                  for (final item in groups[categoryId]!)
                                     CheckboxListTile(
                                       key: ValueKey('select-${item.id}'),
                                       title: Text(item.name),
-                                      subtitle: item.buySoon
-                                          ? const Text('すぐ買いたい！')
-                                          : null,
+                                      subtitle: item.shoppingDetails.isEmpty
+                                          ? null
+                                          : Text(item.shoppingDetails),
                                       value: trip.selected.contains(item.id),
                                       onChanged: (value) => ref
                                           .read(

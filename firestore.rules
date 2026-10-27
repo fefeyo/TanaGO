@@ -104,25 +104,49 @@ service cloud.firestore {
           && request.resource.data.names.diff(resource.data.names).affectedKeys().hasOnly([request.resource.data.lastEditedId])
           && validEntry(request.resource.data.names, request.resource.data.lastEditedId);
       }
+      function validItemData(d) {
+        return d.keys().hasAll(['name', 'addedByUid', 'createdAt', 'categoryId', 'isPurchased', 'purchasedByUid', 'purchasedAt'])
+          && d.keys().hasOnly(['name', 'addedByUid', 'createdAt', 'categoryId', 'isPurchased', 'purchasedByUid', 'purchasedAt', 'priority', 'purchaseId', 'quantity', 'memo'])
+          && d.get('quantity', '') is string && d.get('quantity', '').size() <= 40
+          && d.get('memo', '') is string && d.get('memo', '').size() <= 300
+          && d.get('priority', 'normal') in ['high', 'normal', 'low']
+          && text(d.name, 200) && text(d.addedByUid, 128) && d.createdAt is timestamp
+          && (d.categoryId == null || d.categoryId in allowedCategories(hid))
+          && d.isPurchased is bool
+          && ((d.isPurchased && text(d.purchasedByUid, 128) && d.purchasedAt is timestamp)
+            || (!d.isPurchased && d.purchasedByUid == null && d.purchasedAt == null));
+      }
+      function activeItemPath(itemId) {
+        return /databases/$(database)/documents/households/$(hid)/shoppingLists/active/items/$(itemId);
+      }
+      function purchasePath(itemId) {
+        return /databases/$(database)/documents/households/$(hid)/purchaseHistory/$(itemId);
+      }
+      function restoresPurchase(itemId) {
+        return exists(purchasePath(itemId))
+          && !existsAfter(purchasePath(itemId))
+          && request.resource.data.diff(get(purchasePath(itemId)).data).affectedKeys()
+            .hasOnly(['purchaseId', 'isPurchased', 'purchasedByUid', 'purchasedAt']);
+      }
+      match /purchaseHistory/{itemId} {
+        allow read, delete: if member(hid);
+        allow create: if member(hid) && validItemData(request.resource.data)
+          && text(request.resource.data.purchaseId, 128)
+          && request.resource.data.isPurchased == true
+          && request.resource.data.purchasedByUid == request.auth.uid
+          && request.resource.data.purchasedAt == request.time
+          && exists(activeItemPath(itemId)) && !existsAfter(activeItemPath(itemId))
+          && request.resource.data.diff(get(activeItemPath(itemId)).data).affectedKeys()
+            .hasOnly(['purchaseId', 'isPurchased', 'purchasedByUid', 'purchasedAt']);
+      }
       match /shoppingLists/{listId} {
         allow read: if member(hid) && listId == 'active';
         match /items/{itemId} {
-          function validItem() {
-            let d = request.resource.data;
-            return d.keys().hasAll(['name', 'addedByUid', 'createdAt', 'categoryId', 'isPurchased', 'purchasedByUid', 'purchasedAt'])
-              && d.keys().hasOnly(['name', 'addedByUid', 'createdAt', 'categoryId', 'isPurchased', 'purchasedByUid', 'purchasedAt', 'priority'])
-              && d.get('priority', 'normal') in ['high', 'normal', 'low']
-              && text(d.name, 200) && text(d.addedByUid, 128) && d.createdAt is timestamp
-              && (d.categoryId == null || d.categoryId in allowedCategories(hid))
-              && d.isPurchased is bool
-              && ((d.isPurchased && text(d.purchasedByUid, 128) && d.purchasedAt is timestamp)
-                || (!d.isPurchased && d.purchasedByUid == null && d.purchasedAt == null));
-          }
           allow read, delete: if member(hid) && listId == 'active';
-          allow create: if member(hid) && listId == 'active' && validItem()
-            && request.resource.data.addedByUid == request.auth.uid
+          allow create: if member(hid) && listId == 'active' && validItemData(request.resource.data) && !('purchaseId' in request.resource.data)
+            && (request.resource.data.addedByUid == request.auth.uid || restoresPurchase(itemId))
             && request.resource.data.isPurchased == false;
-          allow update: if member(hid) && listId == 'active' && validItem()
+          allow update: if member(hid) && listId == 'active' && validItemData(request.resource.data) && !('purchaseId' in request.resource.data)
             && request.resource.data.addedByUid == resource.data.addedByUid
             && request.resource.data.createdAt == resource.data.createdAt
             && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['isPurchased', 'purchasedByUid', 'purchasedAt'])

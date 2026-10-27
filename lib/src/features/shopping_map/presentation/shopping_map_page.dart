@@ -29,6 +29,64 @@ class ShoppingMapPage extends ConsumerStatefulWidget {
 
 class _ShoppingMapPageState extends ConsumerState<ShoppingMapPage> {
   String? _selectedShelfId;
+  final _viewport = MapViewportController();
+  final _sheet = DraggableScrollableController();
+  int _focusRequest = 0;
+  ScrollController? _productScroll;
+
+  void _selectShelf(String? id) {
+    setState(() => _selectedShelfId = id);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && (_productScroll?.hasClients ?? false)) {
+        _productScroll!.jumpTo(0);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _viewport.dispose();
+    _sheet.dispose();
+    super.dispose();
+  }
+
+  Future<void> _resizeSheet(double size) async {
+    if (_sheet.isAttached) {
+      await _sheet.animateTo(
+        size,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
+  Future<void> _locate(ShoppingItem item, List<MapObject> objects) async {
+    final shelf = objects
+        .where(
+          (o) =>
+              o.type == MapObjectType.shelf &&
+              o.categoryIds.contains(item.categoryId),
+        )
+        .firstOrNull;
+    if (shelf == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('この商品の売り場はまだ登録されていません。チェックは一覧からできます。')),
+      );
+      return;
+    }
+    final request = ++_focusRequest;
+    _selectShelf(shelf.id);
+    await _resizeSheet(0.32);
+    if (!mounted || request != _focusRequest) return;
+    _viewport.focus(
+      Rect.fromLTWH(
+        shelf.x * MapViewport.cellSize,
+        shelf.y * MapViewport.cellSize,
+        shelf.width * MapViewport.cellSize,
+        shelf.height * MapViewport.cellSize,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -136,8 +194,8 @@ class _ShoppingMapPageState extends ConsumerState<ShoppingMapPage> {
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
               child: Text(
                 shoppingItems.isEmpty
-                    ? '濃い緑の棚に買いたいものがあります / 棚をタップで詳細'
-                    : '濃い緑の棚に未チェックの商品があります / 棚をタップで詳細',
+                    ? '濃い緑の棚に買いたいものがあります / 商品名で売り場へ'
+                    : '濃い緑の棚に未チェックの商品があります / 商品名で売り場へ',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ),
@@ -150,76 +208,126 @@ class _ShoppingMapPageState extends ConsumerState<ShoppingMapPage> {
             if (shoppingItemsAsync.hasError) const Text('買うものを読み込めませんでした'),
             if (shoppingItemsAsync.isLoading) const LinearProgressIndicator(),
             Expanded(
-              child: objectsAsync.isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : objectsAsync.hasError
-                      ? Center(
-                          child: TextButton(
-                            onPressed: () =>
-                                ref.invalidate(mapEditorProvider(mapKey)),
-                            child: const Text('マップを再読み込み'),
-                          ),
-                        )
-                      : objects.isEmpty
-                          ? const _EmptyMap()
-                          : store == null
+              child: LayoutBuilder(
+                builder: (context, constraints) => Stack(
+                  children: [
+                    AnimatedBuilder(
+                      animation: _sheet,
+                      builder: (context, child) => Positioned(
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: constraints.maxHeight *
+                            (_sheet.isAttached ? _sheet.size : 0.5),
+                        child: child!,
+                      ),
+                      child: objectsAsync.isLoading
+                          ? const Center(child: CircularProgressIndicator())
+                          : objectsAsync.hasError
                               ? Center(
-                                  child: Text(
-                                    storesAsync.isLoading
-                                        ? '店舗を読み込み中…'
-                                        : '店舗を読み込めませんでした',
+                                  child: TextButton(
+                                    onPressed: () => ref.invalidate(
+                                      mapEditorProvider(mapKey),
+                                    ),
+                                    child: const Text('マップを再読み込み'),
                                   ),
                                 )
-                              : MapViewport(
-                                  columns: store.mapWidth,
-                                  rows: store.mapHeight,
-                                  builder: (_, __) => Stack(
-                                    children: [
-                                      const Positioned.fill(
-                                        child: RepaintBoundary(
-                                          child: CustomPaint(
-                                            painter: _StoreFloorPainter(),
+                              : objects.isEmpty
+                                  ? const _EmptyMap()
+                                  : store == null
+                                      ? Center(
+                                          child: Text(
+                                            storesAsync.isLoading
+                                                ? '店舗を読み込み中…'
+                                                : '店舗を読み込めませんでした',
+                                          ),
+                                        )
+                                      : MapViewport(
+                                          controller: _viewport,
+                                          columns: store.mapWidth,
+                                          rows: store.mapHeight,
+                                          builder: (_, __) => Stack(
+                                            children: [
+                                              const Positioned.fill(
+                                                child: RepaintBoundary(
+                                                  child: CustomPaint(
+                                                    painter:
+                                                        _StoreFloorPainter(),
+                                                  ),
+                                                ),
+                                              ),
+                                              for (final object in objects)
+                                                Positioned(
+                                                  left: object.x *
+                                                      MapViewport.cellSize,
+                                                  top: object.y *
+                                                      MapViewport.cellSize,
+                                                  width: object.width *
+                                                      MapViewport.cellSize,
+                                                  height: object.height *
+                                                      MapViewport.cellSize,
+                                                  child: _ShoppingMapObject(
+                                                    object: object,
+                                                    categories: categories,
+                                                    isRequired:
+                                                        highlightedShelfIds
+                                                            .contains(
+                                                      object.id,
+                                                    ),
+                                                    isSelected:
+                                                        _selectedShelfId ==
+                                                            object.id,
+                                                    onTap: object.type ==
+                                                            MapObjectType.shelf
+                                                        ? () {
+                                                            _focusRequest++;
+                                                            setState(
+                                                              () =>
+                                                                  _selectedShelfId =
+                                                                      object.id,
+                                                            );
+                                                            _resizeSheet(
+                                                              0.62,
+                                                            );
+                                                          }
+                                                        : null,
+                                                  ),
+                                                ),
+                                            ],
                                           ),
                                         ),
-                                      ),
-                                      for (final object in objects)
-                                        Positioned(
-                                          left: object.x * MapViewport.cellSize,
-                                          top: object.y * MapViewport.cellSize,
-                                          width: object.width *
-                                              MapViewport.cellSize,
-                                          height: object.height *
-                                              MapViewport.cellSize,
-                                          child: _ShoppingMapObject(
-                                            object: object,
-                                            categories: categories,
-                                            isRequired: highlightedShelfIds
-                                                .contains(object.id),
-                                            isSelected:
-                                                _selectedShelfId == object.id,
-                                            onTap: object.type ==
-                                                    MapObjectType.shelf
-                                                ? () => setState(
-                                                      () => _selectedShelfId =
-                                                          object.id,
-                                                    )
-                                                : null,
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-            ),
-            _ShelfItemsPanel(
-              shelf: selectedShelf,
-              browsing: browsing,
-              categories: categories,
-              items: selectedItems,
-              checked: trip.checked,
-              onClearShelf: () => setState(() => _selectedShelfId = null),
-              onTogglePurchased: (id) => ref
-                  .read(shoppingTripProvider(mapKey).notifier)
-                  .check(id, !trip.checked.contains(id)),
+                    ),
+                    DraggableScrollableSheet(
+                      controller: _sheet,
+                      initialChildSize: 0.5,
+                      minChildSize: 0.22,
+                      maxChildSize: 0.88,
+                      snap: true,
+                      snapSizes: const [0.32, 0.5, 0.88],
+                      builder: (context, scrollController) => _ShelfItemsPanel(
+                        scrollController: scrollController,
+                        shelf: selectedShelf,
+                        browsing: browsing,
+                        categories: categories,
+                        items: selectedItems,
+                        checked: trip.checked,
+                        mappedCategories: objects
+                            .where((o) => o.type == MapObjectType.shelf)
+                            .expand((o) => o.categoryIds)
+                            .toSet(),
+                        onClearShelf: () =>
+                            setState(() => _selectedShelfId = null),
+                        onLocate: (item) => _locate(item, objects),
+                        onExpand: () => _resizeSheet(0.88),
+                        onCollapse: () => _resizeSheet(0.22),
+                        onTogglePurchased: (id) => ref
+                            .read(shoppingTripProvider(mapKey).notifier)
+                            .check(id, !trip.checked.contains(id)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
@@ -231,7 +339,7 @@ class _ShoppingMapPageState extends ConsumerState<ShoppingMapPage> {
                       ? () => context.push('/stores/${widget.storeId}/complete')
                       : null,
                   child: Text(
-                    'チェックした${shoppingItems.where((i) => trip.checked.contains(i.id)).length}点の購入を完了する',
+                    '購入内容を確認（${shoppingItems.where((i) => trip.checked.contains(i.id)).length}点）',
                   ),
                 ),
               ),
@@ -339,52 +447,63 @@ class _ShoppingMapObject extends StatelessWidget {
 
 class _ShelfItemsPanel extends StatelessWidget {
   const _ShelfItemsPanel({
+    required this.scrollController,
     required this.shelf,
     required this.browsing,
     required this.categories,
     required this.items,
-    required this.onTogglePurchased,
     required this.checked,
+    required this.mappedCategories,
+    required this.onTogglePurchased,
     required this.onClearShelf,
+    required this.onLocate,
+    required this.onExpand,
+    required this.onCollapse,
   });
-
+  final ScrollController scrollController;
   final MapObject? shelf;
   final bool browsing;
   final List<ProductCategory> categories;
   final List<ShoppingItem> items;
-  final ValueChanged<String> onTogglePurchased;
   final Set<String> checked;
+  final Set<String> mappedCategories;
+  final ValueChanged<String> onTogglePurchased;
+  final ValueChanged<ShoppingItem> onLocate;
   final VoidCallback onClearShelf;
+  final VoidCallback onExpand;
+  final VoidCallback onCollapse;
 
   @override
   Widget build(BuildContext context) {
     final title = shelf == null
-        ? browsing
-            ? '買いたいもの'
-            : '今回買うもの'
+        ? (browsing ? '買いたいもの' : '今回買うもの')
         : shelf!.label?.isNotEmpty == true
             ? '${shelf!.label}で買うもの'
             : 'この棚の売り場';
-
-    return Container(
-      width: double.infinity,
-      constraints: const BoxConstraints(maxHeight: 230),
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x18000000),
-            blurRadius: 18,
-            offset: Offset(0, -4),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
+    final known =
+        items.where((i) => mappedCategories.contains(i.categoryId)).toList();
+    final unknown =
+        items.where((i) => !mappedCategories.contains(i.categoryId)).toList();
+    return Material(
+      color: Colors.white,
+      elevation: 8,
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      clipBehavior: Clip.antiAlias,
+      child: ListView(
+        key: const ValueKey('shopping-product-sheet'),
+        controller: scrollController,
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
         children: [
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xFFCBD5C8),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
           Row(
             children: [
               Expanded(
@@ -394,65 +513,132 @@ class _ShelfItemsPanel extends StatelessWidget {
                 ),
               ),
               if (shelf != null)
-                Icon(
-                  Icons.location_on,
-                  color: Theme.of(context).colorScheme.primary,
+                IconButton(
+                  tooltip: 'すべての商品を表示',
+                  onPressed: onClearShelf,
+                  icon: const Icon(Icons.close),
                 ),
+              IconButton(
+                tooltip: 'リストを広げる',
+                onPressed: onExpand,
+                icon: const Icon(Icons.keyboard_arrow_up),
+              ),
+              IconButton(
+                tooltip: 'マップを広げる',
+                onPressed: onCollapse,
+                icon: const Icon(Icons.keyboard_arrow_down),
+              ),
             ],
           ),
-          const SizedBox(height: 8),
-          if (shelf != null)
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  for (final name in shelfCategoryNames(shelf!, categories))
-                    Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: Chip(
-                        label: Text(name),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    ),
-                  if (shelf!.categoryIds.isEmpty) const Text('カテゴリ未設定'),
-                ],
-              ),
+          if (shelf != null) ...[
+            Wrap(
+              spacing: 6,
+              children: [
+                for (final name in shelfCategoryNames(shelf!, categories))
+                  Chip(label: Text(name), visualDensity: VisualDensity.compact),
+                if (shelf!.categoryIds.isEmpty) const Text('カテゴリ未設定'),
+              ],
             ),
-          if (shelf != null)
-            TextButton(onPressed: onClearShelf, child: const Text('すべての商品を表示')),
+          ],
           if (items.isEmpty)
-            Text(shelf == null ? '「買うものを選ぶ」から今回の商品を選べます。' : '今回この棚で買うものはありません。')
-          else
-            Flexible(
-              child: ListView.separated(
-                shrinkWrap: true,
-                itemCount: items.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
-                itemBuilder: (context, index) {
-                  final item = items[index];
-                  if (browsing) {
-                    return ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(item.name),
-                      subtitle: item.buySoon ? const Text('すぐ買いたい！') : null,
-                    );
-                  }
-                  return CheckboxListTile(
-                    contentPadding: EdgeInsets.zero,
-                    dense: true,
-                    value: checked.contains(item.id),
-                    title: Text(item.name),
-                    subtitle: item.buySoon ? const Text('すぐ買いたい！') : null,
-                    onChanged: (_) => onTogglePurchased(item.id),
-                  );
-                },
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Text(
+                shelf == null ? '「買うものを選ぶ」から今回の商品を選べます。' : '今回この棚で買うものはありません。',
               ),
             ),
+          for (final item in known) _row(context, item, true),
+          if (unknown.isNotEmpty) ...[
+            const Padding(
+              padding: EdgeInsets.fromLTRB(8, 12, 8, 4),
+              child: Text(
+                '場所未登録',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8),
+              child: Text(
+                '売り場がわからなくても、ここからチェックできます。',
+                style: TextStyle(fontSize: 12),
+              ),
+            ),
+            for (final item in unknown) _row(context, item, false),
+          ],
         ],
       ),
     );
   }
+
+  Widget _row(BuildContext context, ShoppingItem item, bool located) =>
+      Container(
+        margin: const EdgeInsets.only(top: 6),
+        decoration: BoxDecoration(
+          color: checked.contains(item.id)
+              ? const Color(0xFFEEF3EA)
+              : item.buySoon
+                  ? const Color(0xFFFFE4D8)
+                  : const Color(0xFFF6F6F0),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: InkWell(
+                key: ValueKey('map-locate-${item.id}'),
+                borderRadius: BorderRadius.circular(12),
+                onTap: () => onLocate(item),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 64),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          item.name,
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w600,
+                            decoration: checked.contains(item.id)
+                                ? TextDecoration.lineThrough
+                                : null,
+                          ),
+                        ),
+                        if (item.shoppingDetails.isNotEmpty)
+                          Text(item.shoppingDetails),
+                        if (located)
+                          const Text(
+                            'タップで売り場へ',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF426A52),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            if (!browsing)
+              Semantics(
+                label: '${item.name}の購入チェック',
+                child: SizedBox(
+                  width: 56,
+                  height: 64,
+                  child: Checkbox(
+                    key: ValueKey('map-check-${item.id}'),
+                    value: checked.contains(item.id),
+                    onChanged: (_) => onTogglePurchased(item.id),
+                    materialTapTargetSize: MaterialTapTargetSize.padded,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      );
 }
 
 class _EmptyMap extends StatelessWidget {
@@ -464,7 +650,7 @@ class _EmptyMap extends StatelessWidget {
       child: Padding(
         padding: EdgeInsets.all(24),
         child: Text(
-          'この店舗にはまだ店内マップがありません。\n先にマップを作成してください。',
+          'この店舗にはまだ店内マップがありません。\n下の一覧で購入チェックできます。',
           textAlign: TextAlign.center,
         ),
       ),
