@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../design/app_palette.dart';
+import '../../../design/app_components.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../shopping_trip/presentation/shopping_trip_controller.dart';
@@ -119,6 +121,16 @@ class _ShoppingMapPageState extends ConsumerState<ShoppingMapPage> {
           : pendingItems,
     );
 
+    final shelfCounts = {
+      for (final object in objects.where((o) => o.type == MapObjectType.shelf))
+        object.id: itemsForShelf(
+          shelf: object,
+          shoppingItems: shoppingItems.isEmpty
+              ? shoppingItemsAsync.valueOrNull ?? const <ShoppingItem>[]
+              : pendingItems,
+        ).length,
+    };
+
     final selectedShelf =
         objects.where((object) => object.id == _selectedShelfId).firstOrNull;
 
@@ -182,7 +194,7 @@ class _ShoppingMapPageState extends ConsumerState<ShoppingMapPage> {
                         minHeight: 6,
                         value: (shoppingItems.length - pendingItems.length) /
                             shoppingItems.length,
-                        backgroundColor: const Color(0xFFE3EBDC),
+                        backgroundColor: AppPalette.softGreen,
                         semanticsLabel: '購入チェックの進捗',
                       ),
                     ),
@@ -194,8 +206,8 @@ class _ShoppingMapPageState extends ConsumerState<ShoppingMapPage> {
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
               child: Text(
                 shoppingItems.isEmpty
-                    ? '濃い緑の棚に買いたいものがあります / 商品名で売り場へ'
-                    : '濃い緑の棚に未チェックの商品があります / 商品名で売り場へ',
+                    ? '緑の棚と件数が目印。商品名をタップで売り場へ。'
+                    : '緑の棚の「あと○点」が目印。商品名で売り場へ。',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ),
@@ -268,6 +280,9 @@ class _ShoppingMapPageState extends ConsumerState<ShoppingMapPage> {
                                                       MapViewport.cellSize,
                                                   child: _ShoppingMapObject(
                                                     object: object,
+                                                    remaining: shelfCounts[
+                                                            object.id] ??
+                                                        0,
                                                     categories: categories,
                                                     isRequired:
                                                         highlightedShelfIds
@@ -365,7 +380,7 @@ class _SummaryChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: const Color(0xFFE7EFE3),
+        color: AppPalette.softGreen,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
@@ -384,13 +399,14 @@ class _ShoppingMapObject extends StatelessWidget {
   const _ShoppingMapObject({
     required this.object,
     required this.categories,
+    required this.remaining,
     required this.isRequired,
     required this.isSelected,
     required this.onTap,
   });
-
   final MapObject object;
   final List<ProductCategory> categories;
+  final int remaining;
   final bool isRequired;
   final bool isSelected;
   final VoidCallback? onTap;
@@ -398,47 +414,79 @@ class _ShoppingMapObject extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-
     final baseColor = switch (object.type) {
-      MapObjectType.shelf => const Color(0xFFEAE6DA),
+      MapObjectType.shelf => const Color(0xFFEEEDE5),
       MapObjectType.wall => scheme.outlineVariant,
-      MapObjectType.entrance => scheme.tertiaryContainer,
-      MapObjectType.exit => scheme.tertiaryContainer,
+      MapObjectType.entrance || MapObjectType.exit => scheme.tertiaryContainer,
       MapObjectType.register => scheme.secondaryContainer,
     };
-
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        key: ValueKey('shopping-shelf-${object.id}'),
-        duration: const Duration(milliseconds: 180),
-        margin: const EdgeInsets.all(2),
-        decoration: BoxDecoration(
-          color: isRequired ? scheme.primary : baseColor,
-          borderRadius: BorderRadius.circular(7),
-          border: Border.all(
-            color: isSelected
-                ? const Color(0xFFCE8900)
-                : isRequired
-                    ? scheme.primary.withValues(alpha: 0.65)
-                    : scheme.outlineVariant,
-            width: isSelected ? 3 : 1,
-          ),
-          boxShadow: isRequired
-              ? [
-                  BoxShadow(
-                    color: scheme.primary.withValues(
-                      alpha: isSelected ? 0.34 : 0.18,
+    return Semantics(
+      label: remaining > 0 ? 'この棚であと$remaining点' : null,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Stack(
+          clipBehavior: Clip.none,
+          fit: StackFit.expand,
+          children: [
+            AnimatedContainer(
+              key: ValueKey('shopping-shelf-${object.id}'),
+              duration: MediaQuery.disableAnimationsOf(context)
+                  ? Duration.zero
+                  : const Duration(milliseconds: 180),
+              margin: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                color: isRequired ? AppPalette.shelfGreen : baseColor,
+                borderRadius: BorderRadius.circular(9),
+                border: Border.all(
+                  color: isSelected
+                      ? AppPalette.forest
+                      : isRequired
+                          ? const Color(0xFF8FA974)
+                          : AppPalette.line,
+                  width: isSelected ? 3 : 1,
+                ),
+                boxShadow: isRequired
+                    ? [
+                        BoxShadow(
+                          color: AppPalette.forest.withValues(alpha: 0.12),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: DefaultTextStyle.merge(
+                style: const TextStyle(color: AppPalette.ink),
+                child: MapObjectContent(object: object, categories: categories),
+              ),
+            ),
+            if (remaining > 0)
+              Positioned(
+                right: 2,
+                top: -7,
+                child: IgnorePointer(
+                  child: Container(
+                    key: ValueKey('shelf-count-${object.id}'),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: AppPalette.forest,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppPalette.paper),
                     ),
-                    blurRadius: isSelected ? 14 : 8,
-                    spreadRadius: isSelected ? 3 : 1,
+                    child: Text(
+                      object.width >= 2 ? 'あと$remaining点' : '$remaining',
+                      textScaler: TextScaler.noScaling,
+                      style: const TextStyle(
+                        color: AppPalette.paper,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
-                ]
-              : null,
-        ),
-        child: DefaultTextStyle.merge(
-          style: TextStyle(color: isRequired ? Colors.white : scheme.onSurface),
-          child: MapObjectContent(object: object, categories: categories),
+                ),
+              ),
+          ],
         ),
       ),
     );
@@ -485,8 +533,9 @@ class _ShelfItemsPanel extends StatelessWidget {
     final unknown =
         items.where((i) => !mappedCategories.contains(i.categoryId)).toList();
     return Material(
-      color: Colors.white,
-      elevation: 8,
+      color: AppPalette.paper,
+      elevation: 2,
+      shadowColor: AppPalette.forest.withValues(alpha: 0.12),
       borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       clipBehavior: Clip.antiAlias,
       child: ListView(
@@ -499,7 +548,7 @@ class _ShelfItemsPanel extends StatelessWidget {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: const Color(0xFFCBD5C8),
+                color: AppPalette.pistachio,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -571,14 +620,17 @@ class _ShelfItemsPanel extends StatelessWidget {
   }
 
   Widget _row(BuildContext context, ShoppingItem item, bool located) =>
-      Container(
+      AnimatedContainer(
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 180),
         margin: const EdgeInsets.only(top: 6),
         decoration: BoxDecoration(
           color: checked.contains(item.id)
-              ? const Color(0xFFEEF3EA)
+              ? AppPalette.softGreen
               : item.buySoon
-                  ? const Color(0xFFFFE4D8)
-                  : const Color(0xFFF6F6F0),
+                  ? AppPalette.peach
+                  : AppPalette.milk,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -606,14 +658,14 @@ class _ShelfItemsPanel extends StatelessWidget {
                                 : null,
                           ),
                         ),
-                        if (item.shoppingDetails.isNotEmpty)
-                          Text(item.shoppingDetails),
+                        if (item.buySoon) const BuySoonBadge(),
+                        if (item.details.isNotEmpty) Text(item.details),
                         if (located)
                           const Text(
                             'タップで売り場へ',
                             style: TextStyle(
                               fontSize: 11,
-                              color: Color(0xFF426A52),
+                              color: AppPalette.forest,
                             ),
                           ),
                       ],
@@ -664,10 +716,10 @@ class _StoreFloorPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     canvas.drawRect(
       Offset.zero & size,
-      Paint()..color = const Color(0xFFF1F2EB),
+      Paint()..color = AppPalette.milk,
     );
     final grid = Paint()
-      ..color = const Color(0xFFD9DFD5)
+      ..color = AppPalette.grid
       ..strokeWidth = 0.7;
     for (double x = 0; x <= size.width; x += MapViewport.cellSize) {
       canvas.drawLine(Offset(x, 0), Offset(x, size.height), grid);

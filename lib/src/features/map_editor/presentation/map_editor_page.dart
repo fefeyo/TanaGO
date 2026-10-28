@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../design/app_palette.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -718,7 +719,7 @@ class _MapObjectTile extends StatelessWidget {
               : Theme.of(context).colorScheme.outline,
           width: isSelected ? 3 : 1,
         ),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(8),
         boxShadow: isSelected
             ? [
                 BoxShadow(
@@ -746,7 +747,7 @@ class _GridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.black12
+      ..color = AppPalette.line
       ..strokeWidth = 1;
     final cellWidth = size.width / columns;
     final cellHeight = size.height / rows;

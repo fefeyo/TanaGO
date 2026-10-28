@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../design/app_components.dart';
+import '../../../design/app_palette.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../household/presentation/my_name_card.dart';
@@ -46,22 +47,64 @@ class ShoppingListPage extends ConsumerWidget {
           children: [
             MyNameCard(householdId: household.id, onlyWhenMissing: true),
             Padding(
-              padding: const EdgeInsets.all(16),
-              child: PageBanner(
-                eyebrow: household.name,
-                title: '${items.length}点の買いたいもの',
-                icon: Icons.home_outlined,
-                description: '家族の「買ってきて」を、ひとつに。',
-                trailing: FilledButton.icon(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFFE7F0CD),
-                    foregroundColor: const Color(0xFF214C36),
+              padding: const EdgeInsets.fromLTRB(20, 12, 16, 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          household.name,
+                          style: const TextStyle(
+                            color: AppPalette.muted,
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            const Text(
+                              '今日のお買い物',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 4,
+                              ),
+                              decoration: const ShapeDecoration(
+                                color: AppPalette.softGreen,
+                                shape: StadiumBorder(),
+                              ),
+                              child: Text(
+                                '${items.length}点',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppPalette.forest,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                  onPressed: () =>
-                      showShoppingItemDialog(context, household.id),
-                  icon: const Icon(Icons.add, size: 20),
-                  label: const Text('登録'),
-                ),
+                  const SizedBox(width: 12),
+                  FilledButton.icon(
+                    onPressed: () =>
+                        showShoppingItemDialog(context, household.id),
+                    icon: const Icon(Icons.add_rounded, size: 20),
+                    label: const Text('登録'),
+                  ),
+                ],
               ),
             ),
             Align(

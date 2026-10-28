@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../design/app_components.dart';
+import '../../../design/app_palette.dart';
 import '../../product_categories/domain/product_category.dart';
 import '../domain/shopping_item.dart';
 
@@ -90,7 +92,7 @@ class _CategoryHeader extends SliverPersistentHeaderDelegate {
   final int count;
   final TextScaler textScaler;
   @override
-  double get minExtent => 24 + textScaler.scale(18);
+  double get minExtent => 28 + textScaler.scale(18);
   @override
   double get maxExtent => minExtent;
   @override
@@ -105,17 +107,11 @@ class _CategoryHeader extends SliverPersistentHeaderDelegate {
           key: ValueKey('category-header-${id ?? 'unclassified'}'),
           height: maxExtent,
           color: Theme.of(context).scaffoldBackgroundColor,
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           child: Row(
             children: [
-              if (id == null) ...[
-                const Icon(
-                  Icons.warning_amber_rounded,
-                  color: Color(0xFF8A5800),
-                  size: 20,
-                ),
-                const SizedBox(width: 6),
-              ],
+              CategorySymbol(categoryId: id, size: 28),
+              const SizedBox(width: 8),
               Expanded(
                 child: Tooltip(
                   message: name,
@@ -128,7 +124,10 @@ class _CategoryHeader extends SliverPersistentHeaderDelegate {
                 ),
               ),
               const SizedBox(width: 8),
-              Text('$count点', style: Theme.of(context).textTheme.bodySmall),
+              Text(
+                '$count点',
+                style: const TextStyle(fontSize: 12, color: AppPalette.muted),
+              ),
             ],
           ),
         ),
@@ -154,76 +153,66 @@ class _CompactItem extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   @override
-  Widget build(BuildContext context) => Material(
-        color: item.buySoon
-            ? const Color(0xFFFFE4D8)
-            : unclassified
-                ? const Color(0xFFFFF5DF)
-                : Colors.white,
-        child: InkWell(
-          onTap: onEdit,
-          child: Container(
-            decoration: BoxDecoration(
-              border: Border(
-                left: BorderSide(
-                  color: item.buySoon
-                      ? const Color(0xFFB24B32)
-                      : Colors.transparent,
-                  width: 3,
-                ),
-                bottom: const BorderSide(color: Color(0xFFE6EAE3)),
-              ),
-            ),
-            padding: const EdgeInsets.only(left: 9, top: 4, bottom: 4),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item.name,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleSmall,
-                      ),
-                      if (item.details.isNotEmpty)
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: Material(
+          borderRadius: BorderRadius.circular(14),
+          clipBehavior: Clip.antiAlias,
+          color: item.buySoon
+              ? AppPalette.peach
+              : unclassified
+                  ? AppPalette.butter
+                  : AppPalette.paper,
+          child: InkWell(
+            onTap: onEdit,
+            child: Container(
+              padding: const EdgeInsets.only(left: 12, top: 4, bottom: 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Text(
-                          item.details,
-                          maxLines: 1,
+                          item.name,
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodySmall,
+                          style: Theme.of(context).textTheme.titleSmall,
                         ),
-                      if (item.buySoon)
-                        const Text(
-                          'すぐ買いたい！',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF9B3C28),
-                            fontWeight: FontWeight.w600,
+                        if (item.details.isNotEmpty)
+                          Text(
+                            item.details,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall,
                           ),
-                        ),
-                      if (unclassified)
-                        const Padding(
-                          padding: EdgeInsets.only(top: 2),
-                          child: Text(
-                            'カテゴリを設定',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF8A5800),
-                              fontWeight: FontWeight.w600,
+                        if (item.buySoon) const BuySoonBadge(),
+                        if (unclassified)
+                          const Padding(
+                            padding: EdgeInsets.only(top: 2),
+                            child: Text(
+                              'カテゴリを設定',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppPalette.amberInk,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                IconButton(
-                  tooltip: '${item.name}を削除',
-                  onPressed: onDelete,
-                  icon: const Icon(Icons.delete_outline, size: 20),
-                ),
-              ],
+                  IconButton(
+                    tooltip: '${item.name}を削除',
+                    onPressed: onDelete,
+                    icon: const Icon(
+                      Icons.delete_outline_rounded,
+                      size: 20,
+                      color: AppPalette.muted,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

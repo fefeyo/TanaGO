@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../../../design/app_components.dart';
+import '../../../design/app_palette.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../household/presentation/household_controller.dart';
@@ -49,18 +50,15 @@ class _ShoppingCompletionPageState
             children: [
               Padding(
                 padding: const EdgeInsets.all(16),
-                child: PageBanner(
-                  eyebrow: _completed == null ? '最後に購入内容を確認' : 'お買い物、おつかれさまでした',
-                  icon: _completed == null
-                      ? Icons.shopping_bag_outlined
-                      : Icons.task_alt,
-                  title: _completed == null
-                      ? 'チェックした${checked.length}点を購入済みにします'
-                      : '${shown.length}点の購入が完了しました',
-                  description: _completed == null
-                      ? '買っていないものはチェックを外してください。チェックした商品だけ登録一覧から消えます。'
-                      : '最近買ったものに保存しました。間違えたときは、この画面で購入完了を取り消せます。',
-                ),
+                child: _completed != null
+                    ? PurchaseCelebration(count: shown.length)
+                    : PageBanner(
+                        eyebrow: '最後に購入内容を確認',
+                        icon: Icons.shopping_bag_outlined,
+                        title: 'チェックした${checked.length}点を購入済みにします',
+                        description:
+                            '買っていないものはチェックを外してください。チェックした商品だけ登録一覧から消えます。',
+                      ),
               ),
               if (asyncItems.isLoading && _completed == null)
                 const LinearProgressIndicator(),
@@ -101,7 +99,7 @@ class _ShoppingCompletionPageState
                                     CategorySymbol(categoryId: item.categoryId),
                                 trailing: const Icon(
                                   Icons.check_circle,
-                                  color: Color(0xFF246653),
+                                  color: AppPalette.forest,
                                 ),
                               ),
                       ),

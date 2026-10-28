@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../design/app_palette.dart';
 import '../../../design/app_components.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -59,12 +60,12 @@ class StoreListPage extends ConsumerWidget {
                               leading: Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFE8EFE3),
+                                  color: AppPalette.softGreen,
                                   borderRadius: BorderRadius.circular(16),
                                 ),
                                 child: const Icon(
                                   Icons.storefront_outlined,
-                                  color: Color(0xFF246653),
+                                  color: AppPalette.forest,
                                 ),
                               ),
                               title: Text(
